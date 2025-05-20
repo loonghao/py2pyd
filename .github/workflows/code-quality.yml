@@ -28,7 +28,7 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Check for security vulnerabilities
-        uses: actions-rs/audit-check@v1
+        uses: rustsec/audit-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -45,7 +45,7 @@ jobs:
         run: cargo doc --no-deps --document-private-items
 
       - name: Upload documentation
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rust-docs
           path: target/doc

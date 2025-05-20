@@ -25,7 +25,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -48,7 +48,7 @@ jobs:
         run: cargo test --release
 
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -85,7 +85,7 @@ jobs:
           }
 
       - name: Upload executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: py2pyd-windows
           path: target/release/py2pyd.exe
@@ -108,7 +108,7 @@ jobs:
           sudo apt-get install -y build-essential python3-dev
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -125,7 +125,7 @@ jobs:
         run: cargo test --release
 
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -162,7 +162,7 @@ jobs:
           fi
 
       - name: Upload executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: py2pyd-linux
           path: target/release/py2pyd
@@ -180,7 +180,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -197,7 +197,7 @@ jobs:
         run: cargo test --release
 
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -234,7 +234,7 @@ jobs:
           fi
 
       - name: Upload executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: py2pyd-macos
           path: target/release/py2pyd

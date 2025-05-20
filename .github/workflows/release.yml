@@ -33,7 +33,7 @@ jobs:
           Compress-Archive -Path release\* -DestinationPath py2pyd-windows.zip
 
       - name: Upload Release Asset
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: py2pyd-windows
           path: py2pyd-windows.zip
@@ -65,7 +65,7 @@ jobs:
           tar -czf py2pyd-linux.tar.gz -C release .
 
       - name: Upload Release Asset
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: py2pyd-linux
           path: py2pyd-linux.tar.gz
@@ -92,7 +92,7 @@ jobs:
           tar -czf py2pyd-macos.tar.gz -C release .
 
       - name: Upload Release Asset
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: py2pyd-macos
           path: py2pyd-macos.tar.gz
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
