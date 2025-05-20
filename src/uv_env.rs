@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use log::{debug, info, warn};
+use log::{info, warn};
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -55,8 +55,12 @@ impl UvEnv {
         // Create a temporary directory for the virtual environment
         let temp_dir = if config.keep_venv {
             // Create a directory in the user's home directory
-            let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Failed to get home directory"))?;
-            let venv_dir = home_dir.join(".py2pyd").join("venvs").join(Uuid::new_v4().to_string());
+            let home_dir =
+                dirs::home_dir().ok_or_else(|| anyhow!("Failed to get home directory"))?;
+            let venv_dir = home_dir
+                .join(".py2pyd")
+                .join("venvs")
+                .join(Uuid::new_v4().to_string());
             fs::create_dir_all(&venv_dir)
                 .with_context(|| format!("Failed to create directory: {}", venv_dir.display()))?;
             None
@@ -69,11 +73,18 @@ impl UvEnv {
         let venv_path = if let Some(ref temp_dir) = temp_dir {
             temp_dir.path().to_path_buf()
         } else {
-            let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Failed to get home directory"))?;
-            home_dir.join(".py2pyd").join("venvs").join(Uuid::new_v4().to_string())
+            let home_dir =
+                dirs::home_dir().ok_or_else(|| anyhow!("Failed to get home directory"))?;
+            home_dir
+                .join(".py2pyd")
+                .join("venvs")
+                .join(Uuid::new_v4().to_string())
         };
 
-        info!("Creating uv virtual environment at: {}", venv_path.display());
+        info!(
+            "Creating uv virtual environment at: {}",
+            venv_path.display()
+        );
 
         // Build the command to create the virtual environment
         let mut cmd = Command::new(&uv_path);
@@ -92,8 +103,7 @@ impl UvEnv {
         cmd.arg(&venv_path);
 
         // Run the command
-        let status = cmd.status()
-            .with_context(|| "Failed to execute uv venv")?;
+        let status = cmd.status().with_context(|| "Failed to execute uv venv")?;
 
         if !status.success() {
             return Err(anyhow!("Failed to create uv virtual environment"));
@@ -107,7 +117,9 @@ impl UvEnv {
         };
 
         if !python_path.exists() {
-            return Err(anyhow!("Python interpreter not found in virtual environment"));
+            return Err(anyhow!(
+                "Python interpreter not found in virtual environment"
+            ));
         }
 
         // Install required packages
@@ -134,7 +146,8 @@ impl UvEnv {
             } else {
                 venv_path.join("bin")
             };
-            paths = format!("{}{}{}",
+            paths = format!(
+                "{}{}{}",
                 bin_dir.to_string_lossy(),
                 if cfg!(windows) { ";" } else { ":" },
                 paths
@@ -142,7 +155,8 @@ impl UvEnv {
             cmd.env(path_var, paths);
 
             // Run the command
-            let status = cmd.status()
+            let status = cmd
+                .status()
                 .with_context(|| "Failed to execute uv pip install")?;
 
             if !status.success() {

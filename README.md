@@ -1,23 +1,27 @@
 # py2pyd
 
-A Rust-based tool to compile Python modules to pyd files, with special support for DCC environments like Maya and Houdini.
+[![CI](https://github.com/loonghao/py2pyd/actions/workflows/ci.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/loonghao/py2pyd/actions/workflows/code-quality.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/code-quality.yml)
+[![Release](https://github.com/loonghao/py2pyd/actions/workflows/release.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/release.yml)
+
+A Rust-based tool to compile Python modules to extension files (.pyd on Windows, .so on Linux/macOS).
 
 > **Warning**: This project is currently under active development and not ready for production use. APIs and functionality may change significantly between versions.
 
 ## Overview
 
-py2pyd is a command-line tool that simplifies the process of compiling Python (.py) files to Python extension modules (.pyd) for Windows. It's particularly useful for developers working with Digital Content Creation (DCC) applications like Maya, Houdini, and others.
+py2pyd is a command-line tool that simplifies the process of compiling Python (.py) files to Python extension modules (.pyd on Windows, .so on Linux/macOS).
 
 ## Features (Planned)
 
-- Compile single Python files or entire directories to pyd files
+- Compile single Python files or entire directories to Python extension modules (.pyd on Windows, .so on Linux/macOS)
 - Support for multiple Python interpreter discovery methods:
   - Default PATH lookup
   - uv integration with version selection (`--uv-python 3.10`)
   - Explicit interpreter path specification (`--python-path`)
 - Batch processing with recursive directory support
 - Optimization level control
-- Special handling for DCC-specific Python environments
+
 - Comprehensive logging and error reporting
 
 ## Installation
@@ -42,9 +46,18 @@ py2pyd --uv-python 3.10 -i src/ -o build/ --recursive
 
 ## Requirements
 
-- Windows operating system
-- Compatible C/C++ compiler (MSVC) for the target Python version
+- Operating system:
+  - Windows (primary target)
+  - Linux and macOS (experimental support)
+- Compatible C/C++ compiler for the target Python version:
+  - **Windows**:
+    - **MSVC (Recommended)**: Install Visual Studio Build Tools from [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+    - **MinGW-w64 (Alternative)**: Install from [here](https://www.mingw-w64.org/downloads/)
+  - **Linux**: GCC (install via `sudo apt-get install build-essential` on Debian/Ubuntu)
+  - **macOS**: Xcode Command Line Tools (install via `xcode-select --install`)
 - Python interpreter (if not using embedded mode)
+
+The tool will automatically check for required build tools and provide installation instructions if they are missing.
 
 ## TODO List
 
@@ -63,14 +76,14 @@ py2pyd --uv-python 3.10 -i src/ -o build/ --recursive
 - [ ] Add comprehensive testing
   - [ ] Unit tests for different Python versions
   - [ ] Integration tests for various compilation scenarios
-  - [ ] CI/CD pipeline setup
+  - [x] CI/CD pipeline setup
 - [ ] Improve documentation
   - [ ] Detailed usage examples
   - [ ] Troubleshooting guide
   - [ ] API documentation
 - [ ] Future enhancements
   - [ ] Investigate embedded Python interpreter option
-  - [ ] Support for additional platforms (Linux, macOS)
+  - [x] Support for additional platforms (Linux, macOS)
   - [ ] Performance optimizations
 
 ## Contributing

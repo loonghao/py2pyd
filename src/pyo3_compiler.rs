@@ -21,7 +21,7 @@ pub struct CompileConfig {
     /// Whether to keep temporary files
     pub keep_temp_files: bool,
 
-    /// Target DCC environment (e.g., "maya2022")
+    /// Target environment (for future use)
     pub target_dcc: Option<String>,
 }
 
@@ -153,7 +153,13 @@ pub fn batch_compile(
         let relative_path = input_path.strip_prefix(Path::new(input_pattern))
             .unwrap_or(&input_path);
         let mut output_path = output_dir.join(relative_path);
-        output_path.set_extension("pyd");
+
+        // Use the appropriate extension based on the platform
+        if cfg!(windows) {
+            output_path.set_extension("pyd");
+        } else {
+            output_path.set_extension("so");
+        }
 
         // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
@@ -350,18 +356,8 @@ fn generate_setup_py(module_name: &str, source_code: &str, config: &CompileConfi
     setup_py.push_str(&format!("        '{}',\n", module_name));
     setup_py.push_str(&format!("        sources=['{}.py'],\n", module_name));
 
-    // Add DCC-specific include paths if needed
-    if let Some(target_dcc) = &config.target_dcc {
-        if target_dcc.starts_with("maya") {
-            setup_py.push_str("        include_dirs=[\n");
-            setup_py.push_str("            # Maya-specific include paths\n");
-            setup_py.push_str("        ],\n");
-        } else if target_dcc.starts_with("houdini") {
-            setup_py.push_str("        include_dirs=[\n");
-            setup_py.push_str("            # Houdini-specific include paths\n");
-            setup_py.push_str("        ],\n");
-        }
-    }
+    // Add custom include paths if needed in the future
+    // Currently not used
 
     // Enable ABI3 compatibility
     setup_py.push_str("        py_limited_api=True,\n");
