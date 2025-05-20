@@ -14,6 +14,10 @@ pub struct BuildTools {
     pub dlltool_path: Option<PathBuf>,
     /// Path to Visual Studio installation
     pub vs_path: Option<PathBuf>,
+    /// Path to GCC compiler (for Unix systems)
+    pub gcc_path: Option<PathBuf>,
+    /// Path to Xcode Command Line Tools (for macOS)
+    pub xcode_path: Option<PathBuf>,
 }
 
 impl BuildTools {
@@ -27,9 +31,19 @@ impl BuildTools {
         self.mingw_path.is_some() && self.dlltool_path.is_some()
     }
 
+    /// Check if GCC is available (for Unix systems)
+    pub fn has_gcc(&self) -> bool {
+        self.gcc_path.is_some()
+    }
+
+    /// Check if Xcode Command Line Tools are available (for macOS)
+    pub fn has_xcode(&self) -> bool {
+        self.xcode_path.is_some()
+    }
+
     /// Check if any build tools are available
     pub fn has_any_tools(&self) -> bool {
-        self.has_msvc() || self.has_mingw()
+        self.has_msvc() || self.has_mingw() || self.has_gcc() || self.has_xcode()
     }
 
     /// Get a string representation of the available build tools
@@ -52,6 +66,14 @@ impl BuildTools {
             info.push_str(&format!("Visual Studio: {}\n", vs.display()));
         }
 
+        if let Some(gcc) = &self.gcc_path {
+            info.push_str(&format!("GCC: {}\n", gcc.display()));
+        }
+
+        if let Some(xcode) = &self.xcode_path {
+            info.push_str(&format!("Xcode Command Line Tools: {}\n", xcode.display()));
+        }
+
         if info.is_empty() {
             info.push_str("No build tools found");
         }
@@ -67,6 +89,8 @@ pub fn detect_build_tools() -> Result<BuildTools> {
         mingw_path: None,
         dlltool_path: None,
         vs_path: None,
+        gcc_path: None,
+        xcode_path: None,
     };
 
     // Detect MSVC
@@ -128,6 +152,44 @@ pub fn detect_build_tools() -> Result<BuildTools> {
         }
     }
 
+    // For Unix systems (Linux and macOS), detect GCC
+    if cfg!(unix) {
+        match which("gcc") {
+            Ok(path) => {
+                debug!("Found GCC compiler: {}", path.display());
+                tools.gcc_path = Some(path);
+            }
+            Err(e) => {
+                debug!("GCC compiler not found in PATH: {}", e);
+            }
+        }
+    }
+
+    // For macOS, detect Xcode Command Line Tools
+    if cfg!(target_os = "macos") {
+        // Check for xcode-select
+        match which("xcode-select") {
+            Ok(path) => {
+                debug!("Found xcode-select: {}", path.display());
+
+                // Try to get the path to the developer directory
+                if let Ok(output) = Command::new("xcode-select").arg("-p").output() {
+                    if output.status.success() {
+                        let output_str = String::from_utf8_lossy(&output.stdout);
+                        let path = PathBuf::from(output_str.trim());
+                        if path.exists() {
+                            tools.xcode_path = Some(path);
+                            debug!("Found Xcode Command Line Tools at: {}", path.display());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                debug!("xcode-select not found in PATH: {}", e);
+            }
+        }
+    }
+
     Ok(tools)
 }
 
@@ -173,10 +235,23 @@ pub fn check_build_tools() -> Result<BuildTools> {
 
     if !tools.has_any_tools() {
         let instructions = get_build_tools_installation_instructions();
-        return Err(anyhow!(
-            "No suitable build tools found. You need either MSVC or MinGW to compile Python extensions.\n\n{}",
-            instructions
-        ));
+
+        if cfg!(windows) {
+            return Err(anyhow!(
+                "No suitable build tools found. You need either MSVC or MinGW to compile Python extensions.\n\n{}",
+                instructions
+            ));
+        } else if cfg!(target_os = "macos") {
+            return Err(anyhow!(
+                "No suitable build tools found. You need Xcode Command Line Tools to compile Python extensions.\n\n{}",
+                instructions
+            ));
+        } else {
+            return Err(anyhow!(
+                "No suitable build tools found. You need GCC and development tools to compile Python extensions.\n\n{}",
+                instructions
+            ));
+        }
     }
 
     Ok(tools)

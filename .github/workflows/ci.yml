@@ -105,7 +105,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential python3-dev
+          sudo apt-get install -y build-essential python3-dev python3-pip python3-setuptools python3-wheel gcc g++ pkg-config libssl-dev
 
       - name: Cache Rust dependencies
         uses: actions/cache@v4
@@ -178,6 +178,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - name: Install macOS build dependencies
+        run: |
+          echo "Installing macOS build dependencies..."
+          # Install C compiler and development tools
+          brew install gcc
+          # Ensure Xcode Command Line Tools are set up
+          xcode-select -p || sudo xcode-select --reset
+          # Install Python development headers
+          brew install python-tk
 
       - name: Cache Rust dependencies
         uses: actions/cache@v4
