@@ -55,7 +55,8 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     // If keep_temp_files is true, don't delete the temp directory when it's dropped
     let temp_dir_path = if config.keep_temp_files {
         let path = temp_dir.path().to_path_buf();
-        temp_dir.into_path();
+        // keep() returns a Result that we need to use
+        let _ = temp_dir.keep();
         path
     } else {
         temp_dir.path().to_path_buf()
@@ -298,8 +299,8 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
 /// Generate a setup.py file for building the extension module
 fn generate_setup_py(
     module_name: &str,
-    source_code: &str,
-    config: &CompileConfig,
+    _source_code: &str,  // Unused but kept for potential future use
+    _config: &CompileConfig,  // Unused but kept for potential future use
 ) -> Result<String> {
     let mut setup_py = String::new();
 

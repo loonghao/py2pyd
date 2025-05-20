@@ -178,8 +178,8 @@ pub fn detect_build_tools() -> Result<BuildTools> {
                         let output_str = String::from_utf8_lossy(&output.stdout);
                         let path = PathBuf::from(output_str.trim());
                         if path.exists() {
-                            tools.xcode_path = Some(path);
                             debug!("Found Xcode Command Line Tools at: {}", path.display());
+                            tools.xcode_path = Some(path);
                         }
                     }
                 }

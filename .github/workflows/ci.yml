@@ -8,6 +8,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  CARGO_INCREMENTAL: "0"
 
 jobs:
   build-windows:
@@ -21,6 +24,9 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
@@ -30,9 +36,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.cargo/bin
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-cargo-
 
       - name: Check code formatting
@@ -43,6 +51,9 @@ jobs:
 
       - name: Build
         run: cargo build --release
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Run tests
         run: cargo test --release
@@ -102,6 +113,9 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -113,13 +127,18 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.cargo/bin
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-cargo-
 
       - name: Build
         run: cargo build --release
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Run tests
         run: cargo test --release
@@ -179,6 +198,9 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Install macOS build dependencies
         run: |
           echo "Installing macOS build dependencies..."
@@ -195,13 +217,18 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.cargo/bin
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-cargo-
 
       - name: Build
         run: cargo build --release
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Run tests
         run: cargo test --release
