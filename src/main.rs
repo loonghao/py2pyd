@@ -1,13 +1,14 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use env_logger::Env;
-use log::{error, info, warn};
+use log::{info, warn};
 use std::path::{Path, PathBuf};
+
+mod build_tools;
 
 mod compiler;
 mod parser;
 mod transformer;
-mod dcc;
 mod python_env;
 mod uv_env;
 mod uv_compiler;
@@ -56,9 +57,7 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
 
-        /// Target DCC environment (maya2022, maya2023, houdini19, houdini20, generic)
-        #[arg(short, long, default_value = "generic")]
-        target: String,
+
 
         /// Optimization level (0-3)
         #[arg(short = 'O', long, default_value = "2")]
@@ -74,9 +73,7 @@ enum Commands {
         #[arg(short, long)]
         output: PathBuf,
 
-        /// Target DCC environment (maya2022, maya2023, houdini19, houdini20, generic)
-        #[arg(short, long, default_value = "generic")]
-        target: String,
+
 
         /// Optimization level (0-3)
         #[arg(short = 'O', long, default_value = "2")]
@@ -100,22 +97,38 @@ fn main() -> Result<()> {
     };
     env_logger::init_from_env(env);
 
+    // Check for required build tools
+    info!("Checking for required build tools...");
+    let build_tools = build_tools::check_build_tools()
+        .with_context(|| "Failed to check build tools")?;
+
+    info!("Build tools found:\n{}", build_tools.get_tools_info());
+
     // Execute command
     match &cli.command {
         Commands::Compile {
             input,
             output,
-            target,
             optimize,
         } => {
             let output = output.clone().unwrap_or_else(|| {
-                let mut output_path = input.clone();
-                output_path.set_extension("pyd");
+                // If no output path is specified, generate a file with the same name as the input file
+                // but with the appropriate extension for the current platform (.pyd on Windows, .so on others)
+                let file_name = input.file_name().unwrap_or_default();
+                let mut output_path = PathBuf::from(file_name);
+
+                // Use the appropriate extension based on the platform
+                if cfg!(windows) {
+                    output_path.set_extension("pyd");
+                } else {
+                    output_path.set_extension("so");
+                }
+
                 output_path
             });
 
             info!("Compiling {} to {}", input.display(), output.display());
-            info!("Target: {}, Optimization level: {}", target, optimize);
+            info!("Optimization level: {}", optimize);
 
             // Parse additional packages
             let packages = cli.packages.as_ref()
@@ -129,7 +142,7 @@ fn main() -> Result<()> {
                     python_version: cli.python_version.clone(),
                     optimize_level: *optimize,
                     keep_temp_files: cli.keep_temp,
-                    target_dcc: Some(target.clone()),
+                    target_dcc: None,
                     packages,
                 };
 
@@ -151,7 +164,7 @@ fn main() -> Result<()> {
                     .with_context(|| "Failed to get Python path")?;
                 info!("Using Python interpreter: {}", python_path.display());
 
-                compile_file(input, &output, target, *optimize)
+                compile_file(input, &output, *optimize)
                     .with_context(|| format!("Failed to compile {}", input.display()))?;
 
                 // Clean up virtual environment if not keeping it
@@ -174,12 +187,11 @@ fn main() -> Result<()> {
         Commands::Batch {
             input,
             output,
-            target,
             optimize,
             recursive,
         } => {
             info!("Batch compiling from {} to {}", input, output.display());
-            info!("Target: {}, Optimization level: {}", target, optimize);
+            info!("Optimization level: {}", optimize);
 
             // Parse additional packages
             let packages = cli.packages.as_ref()
@@ -193,7 +205,7 @@ fn main() -> Result<()> {
                     python_version: cli.python_version.clone(),
                     optimize_level: *optimize,
                     keep_temp_files: cli.keep_temp,
-                    target_dcc: Some(target.clone()),
+                    target_dcc: None,
                     packages,
                 };
 
@@ -215,7 +227,7 @@ fn main() -> Result<()> {
                     .with_context(|| "Failed to get Python path")?;
                 info!("Using Python interpreter: {}", python_path.display());
 
-                batch_compile(input, output, target, *optimize, *recursive)
+                batch_compile(input, output, *optimize, *recursive)
                     .with_context(|| "Failed to batch compile")?;
 
                 // Clean up virtual environment if not keeping it
@@ -240,18 +252,17 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn compile_file(input: &Path, output: &Path, target: &str, optimize: u8) -> Result<()> {
+fn compile_file(input: &Path, output: &Path, optimize: u8) -> Result<()> {
     // This will be implemented in the compiler module
-    compiler::compile_file(input, output, target, optimize)
+    compiler::compile_file(input, output, "generic", optimize)
 }
 
 fn batch_compile(
     input_pattern: &str,
     output_dir: &Path,
-    target: &str,
     optimize: u8,
     recursive: bool,
 ) -> Result<()> {
     // This will be implemented in the compiler module
-    compiler::batch_compile(input_pattern, output_dir, target, optimize, recursive)
+    compiler::batch_compile(input_pattern, output_dir, "generic", optimize, recursive)
 }

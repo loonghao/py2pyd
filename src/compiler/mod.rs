@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
 
-use crate::dcc::{DCCEnvironment, get_dcc_config};
 use crate::transformer::TransformedModule;
 
 /// Compile a single Python file to a pyd file
@@ -18,13 +17,8 @@ pub fn compile_file(
 ) -> Result<()> {
     info!("Compiling {} to {}", input_path.display(), output_path.display());
 
-    // Parse the target DCC environment
-    let dcc_env = crate::dcc::DCCEnvironment::from_str(target)
-        .with_context(|| format!("Invalid target DCC environment: {}", target))?;
-
-    // Get the DCC configuration
-    let dcc_config = get_dcc_config(&dcc_env);
-    debug!("Using DCC config: {:?}", dcc_config);
+    // Target parameter is kept for backward compatibility
+    debug!("Using generic target");
 
     // Transform the Python file to Rust
     let transformed = crate::transformer::transform_file(input_path, optimize_level)
@@ -35,7 +29,7 @@ pub fn compile_file(
         .with_context(|| "Failed to create Rust project")?;
 
     // Build the Rust project
-    build_rust_project(&transformed, &dcc_config)
+    build_rust_project(&transformed)
         .with_context(|| "Failed to build Rust project")?;
 
     // Copy the compiled library to the output path
@@ -75,7 +69,13 @@ pub fn batch_compile(
         let relative_path = input_path.strip_prefix(Path::new(input_pattern))
             .unwrap_or(&input_path);
         let mut output_path = output_dir.join(relative_path);
-        output_path.set_extension("pyd");
+
+        // Use the appropriate extension based on the platform
+        if cfg!(windows) {
+            output_path.set_extension("pyd");
+        } else {
+            output_path.set_extension("so");
+        }
 
         // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
@@ -176,7 +176,7 @@ fn create_rust_project(transformed: &TransformedModule) -> Result<()> {
 }
 
 /// Build a Rust project
-fn build_rust_project(transformed: &TransformedModule, _dcc_config: &crate::dcc::DCCConfig) -> Result<()> {
+fn build_rust_project(transformed: &TransformedModule) -> Result<()> {
     info!("Building Rust project in {}", transformed.build_dir.display());
 
     // Instead of using Python to build, we'll use cargo directly

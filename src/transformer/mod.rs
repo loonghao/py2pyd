@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use log::{debug, info};
 use rustpython_parser::ast;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Represents a transformed Python module

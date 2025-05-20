@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use log::{debug, info, warn};
+use log::{info, warn};
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 use uuid::Uuid;

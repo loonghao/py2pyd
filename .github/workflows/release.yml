@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Create Release Archive
+        run: |
+          mkdir release
+          copy target\release\py2pyd.exe release\
+          copy README.md release\
+          copy LICENSE release\
+          Compress-Archive -Path release\* -DestinationPath py2pyd-windows.zip
+
+      - name: Upload Release Asset
+        uses: actions/upload-artifact@v3
+        with:
+          name: py2pyd-windows
+          path: py2pyd-windows.zip
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Create Release Archive
+        run: |
+          mkdir release
+          cp target/release/py2pyd release/
+          cp README.md release/
+          cp LICENSE release/
+          tar -czf py2pyd-linux.tar.gz -C release .
+
+      - name: Upload Release Asset
+        uses: actions/upload-artifact@v3
+        with:
+          name: py2pyd-linux
+          path: py2pyd-linux.tar.gz
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS Release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Create Release Archive
+        run: |
+          mkdir release
+          cp target/release/py2pyd release/
+          cp README.md release/
+          cp LICENSE release/
+          tar -czf py2pyd-macos.tar.gz -C release .
+
+      - name: Upload Release Asset
+        uses: actions/upload-artifact@v3
+        with:
+          name: py2pyd-macos
+          path: py2pyd-macos.tar.gz
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/py2pyd-windows/py2pyd-windows.zip
+            artifacts/py2pyd-linux/py2pyd-linux.tar.gz
+            artifacts/py2pyd-macos/py2pyd-macos.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

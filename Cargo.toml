@@ -2,7 +2,7 @@
 name = "py2pyd"
 version = "0.1.0"
 edition = "2021"
-authors = ["Hal <loonghao@gmail.com>"]
+authors = ["longhao <hal.long@outlook.com>"]
 description = "A Rust-based tool to compile Python modules to pyd files"
 license = "MIT"
 repository = "https://github.com/loonghao/py2pyd"

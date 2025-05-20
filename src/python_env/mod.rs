@@ -5,7 +5,7 @@ use regex::Regex;
 use reqwest::blocking::Client;
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, copy, Write};
+use std::io::{self, copy};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;

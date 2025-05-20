@@ -1,0 +1,274 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build and Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check code formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Lint with clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Test with Python environment
+        run: |
+          # Create a simple Python file for testing
+          echo "def hello(): return 'Hello, World!'" > test_module.py
+
+          # Test with explicit output path
+          ./target/release/py2pyd.exe compile -i test_module.py -o explicit_output.pyd -O 2
+
+          # Verify the explicit output file exists
+          if (Test-Path explicit_output.pyd) {
+            echo "Successfully compiled test_module.py to explicit_output.pyd"
+          } else {
+            echo "Failed to compile test_module.py with explicit output path"
+            exit 1
+          }
+
+          # Test with default output path (should be in current directory)
+          ./target/release/py2pyd.exe compile -i test_module.py -O 2
+
+          # Verify the default output file exists in current directory
+          if (Test-Path test_module.pyd) {
+            echo "Successfully compiled test_module.py to test_module.pyd in current directory"
+          } else {
+            echo "Failed to compile test_module.py with default output path"
+            exit 1
+          }
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: py2pyd-windows
+          path: target/release/py2pyd.exe
+          if-no-files-found: error
+
+  build-linux:
+    name: Build and Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Test with Python environment
+        run: |
+          # Create a simple Python file for testing
+          echo "def hello(): return 'Hello, World!'" > test_module.py
+
+          # Test with explicit output path
+          ./target/release/py2pyd compile -i test_module.py -o explicit_output.so -O 2
+
+          # Verify the explicit output file exists
+          if [ -f explicit_output.so ]; then
+            echo "Successfully compiled test_module.py to explicit_output.so"
+          else
+            echo "Failed to compile test_module.py with explicit output path"
+            exit 1
+          fi
+
+          # Test with default output path (should be in current directory)
+          ./target/release/py2pyd compile -i test_module.py -O 2
+
+          # Verify the default output file exists in current directory
+          if [ -f test_module.so ]; then
+            echo "Successfully compiled test_module.py to test_module.so in current directory"
+          else
+            echo "Failed to compile test_module.py with default output path"
+            exit 1
+          fi
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: py2pyd-linux
+          path: target/release/py2pyd
+          if-no-files-found: error
+
+  build-macos:
+    name: Build and Test (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Test with Python environment
+        run: |
+          # Create a simple Python file for testing
+          echo "def hello(): return 'Hello, World!'" > test_module.py
+
+          # Test with explicit output path
+          ./target/release/py2pyd compile -i test_module.py -o explicit_output.so -O 2
+
+          # Verify the explicit output file exists
+          if [ -f explicit_output.so ]; then
+            echo "Successfully compiled test_module.py to explicit_output.so"
+          else
+            echo "Failed to compile test_module.py with explicit output path"
+            exit 1
+          fi
+
+          # Test with default output path (should be in current directory)
+          ./target/release/py2pyd compile -i test_module.py -O 2
+
+          # Verify the default output file exists in current directory
+          if [ -f test_module.so ]; then
+            echo "Successfully compiled test_module.py to test_module.so in current directory"
+          else
+            echo "Failed to compile test_module.py with default output path"
+            exit 1
+          fi
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: py2pyd-macos
+          path: target/release/py2pyd
+          if-no-files-found: error
