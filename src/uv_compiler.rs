@@ -43,11 +43,14 @@ impl Default for CompileConfig {
 
 /// Compile a Python file to a pyd file using uv
 pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfig) -> Result<()> {
-    info!("Compiling {} to {}", input_path.display(), output_path.display());
+    info!(
+        "Compiling {} to {}",
+        input_path.display(),
+        output_path.display()
+    );
 
     // Create a temporary directory for the build
-    let temp_dir = TempDir::new()
-        .with_context(|| "Failed to create temporary directory")?;
+    let temp_dir = TempDir::new().with_context(|| "Failed to create temporary directory")?;
 
     // If keep_temp_files is true, don't delete the temp directory when it's dropped
     let temp_dir_path = if config.keep_temp_files {
@@ -98,10 +101,13 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
         packages,
     };
 
-    let uv_env = UvEnv::create(&uv_config)
-        .with_context(|| "Failed to create uv virtual environment")?;
+    let uv_env =
+        UvEnv::create(&uv_config).with_context(|| "Failed to create uv virtual environment")?;
 
-    info!("Created uv virtual environment at: {}", uv_env.venv_path.display());
+    info!(
+        "Created uv virtual environment at: {}",
+        uv_env.venv_path.display()
+    );
     info!("Using Python interpreter: {}", uv_env.python_path.display());
 
     // Build the extension module
@@ -131,8 +137,12 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
         }
     }
 
-    let extension_path = extension_path.ok_or_else(|| anyhow!("Failed to find compiled extension module"))?;
-    debug!("Found compiled extension module: {}", extension_path.display());
+    let extension_path =
+        extension_path.ok_or_else(|| anyhow!("Failed to find compiled extension module"))?;
+    debug!(
+        "Found compiled extension module: {}",
+        extension_path.display()
+    );
 
     // Create the output directory if it doesn't exist
     if let Some(parent) = output_path.parent() {
@@ -141,10 +151,19 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     }
 
     // Copy the compiled extension module to the output path
-    fs::copy(&extension_path, output_path)
-        .with_context(|| format!("Failed to copy {} to {}", extension_path.display(), output_path.display()))?;
+    fs::copy(&extension_path, output_path).with_context(|| {
+        format!(
+            "Failed to copy {} to {}",
+            extension_path.display(),
+            output_path.display()
+        )
+    })?;
 
-    info!("Successfully compiled {} to {}", input_path.display(), output_path.display());
+    info!(
+        "Successfully compiled {} to {}",
+        input_path.display(),
+        output_path.display()
+    );
     Ok(())
 }
 
@@ -155,15 +174,27 @@ pub fn batch_compile(
     config: &CompileConfig,
     recursive: bool,
 ) -> Result<()> {
-    info!("Batch compiling from {} to {}", input_pattern, output_dir.display());
+    info!(
+        "Batch compiling from {} to {}",
+        input_pattern,
+        output_dir.display()
+    );
 
     // Create the output directory if it doesn't exist
-    fs::create_dir_all(output_dir)
-        .with_context(|| format!("Failed to create output directory: {}", output_dir.display()))?;
+    fs::create_dir_all(output_dir).with_context(|| {
+        format!(
+            "Failed to create output directory: {}",
+            output_dir.display()
+        )
+    })?;
 
     // Collect all Python files matching the pattern
-    let python_files = collect_python_files(input_pattern, recursive)
-        .with_context(|| format!("Failed to collect Python files from pattern: {}", input_pattern))?;
+    let python_files = collect_python_files(input_pattern, recursive).with_context(|| {
+        format!(
+            "Failed to collect Python files from pattern: {}",
+            input_pattern
+        )
+    })?;
 
     info!("Found {} Python files to compile", python_files.len());
 
@@ -173,7 +204,8 @@ pub fn batch_compile(
 
     for input_path in python_files {
         // Determine the output path
-        let relative_path = input_path.strip_prefix(Path::new(input_pattern))
+        let relative_path = input_path
+            .strip_prefix(Path::new(input_pattern))
             .unwrap_or(&input_path);
         let mut output_path = output_dir.join(relative_path);
 
@@ -194,7 +226,7 @@ pub fn batch_compile(
         match compile_file(&input_path, &output_path, config) {
             Ok(_) => {
                 success_count += 1;
-            },
+            }
             Err(e) => {
                 warn!("Failed to compile {}: {}", input_path.display(), e);
                 failure_count += 1;
@@ -202,7 +234,10 @@ pub fn batch_compile(
         }
     }
 
-    info!("Batch compilation complete: {} succeeded, {} failed", success_count, failure_count);
+    info!(
+        "Batch compilation complete: {} succeeded, {} failed",
+        success_count, failure_count
+    );
 
     if failure_count > 0 {
         warn!("Some files failed to compile");
@@ -222,7 +257,10 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
 
         // Collect Python files from the directory
         if recursive {
-            for entry in walkdir::WalkDir::new(pattern_path).into_iter().filter_map(|e| e.ok()) {
+            for entry in walkdir::WalkDir::new(pattern_path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
                 let path = entry.path();
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {
                     python_files.push(path.to_path_buf());
@@ -230,7 +268,8 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
             }
         } else {
             for entry in fs::read_dir(pattern_path)
-                .with_context(|| format!("Failed to read directory: {}", pattern_path.display()))? {
+                .with_context(|| format!("Failed to read directory: {}", pattern_path.display()))?
+            {
                 let entry = entry?;
                 let path = entry.path();
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {
@@ -242,8 +281,9 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
         // Treat the pattern as a glob pattern
         debug!("Pattern is a glob pattern: {}", pattern);
 
-        for entry in glob::glob(pattern)
-            .with_context(|| format!("Invalid glob pattern: {}", pattern))? {
+        for entry in
+            glob::glob(pattern).with_context(|| format!("Invalid glob pattern: {}", pattern))?
+        {
             let path = entry?;
             if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {
                 python_files.push(path);
@@ -256,7 +296,11 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
 }
 
 /// Generate a setup.py file for building the extension module
-fn generate_setup_py(module_name: &str, source_code: &str, config: &CompileConfig) -> Result<String> {
+fn generate_setup_py(
+    module_name: &str,
+    source_code: &str,
+    config: &CompileConfig,
+) -> Result<String> {
     let mut setup_py = String::new();
 
     setup_py.push_str("from setuptools import setup, Extension\n");

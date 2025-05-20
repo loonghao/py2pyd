@@ -13,13 +13,12 @@ pub struct TransformedModule {
 }
 
 /// Transform a Python AST into Rust code using PyO3
-pub fn transform_ast(
-    ast: &ast::Suite,
-    module_name: &str,
-    optimize_level: u8,
-) -> Result<String> {
+pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) -> Result<String> {
     info!("Transforming Python AST to Rust code");
-    debug!("Module name: {}, Optimization level: {}", module_name, optimize_level);
+    debug!(
+        "Module name: {}, Optimization level: {}",
+        module_name, optimize_level
+    );
 
     // This is a simplified implementation
     // In a real implementation, we would analyze the AST and generate
@@ -32,12 +31,18 @@ pub fn transform_ast(
     rust_code.push_str("use pyo3::wrap_pyfunction;\n\n");
 
     // Generate module
-    rust_code.push_str(&format!("#[pymodule]\nfn {}(_py: Python, m: &PyModule) -> PyResult<()> {{\n", module_name));
+    rust_code.push_str(&format!(
+        "#[pymodule]\nfn {}(_py: Python, m: &PyModule) -> PyResult<()> {{\n",
+        module_name
+    ));
 
     // Transform functions
     for func in crate::parser::extract_functions(ast) {
         if let ast::StmtKind::FunctionDef { name, .. } = &func.node {
-            rust_code.push_str(&format!("    m.add_function(wrap_pyfunction!({}, m)?)?;\n", name));
+            rust_code.push_str(&format!(
+                "    m.add_function(wrap_pyfunction!({}, m)?)?;\n",
+                name
+            ));
         }
     }
 
@@ -54,7 +59,10 @@ pub fn transform_ast(
     // Generate function implementations
     for func in crate::parser::extract_functions(ast) {
         if let ast::StmtKind::FunctionDef { name, .. } = &func.node {
-            rust_code.push_str(&format!("#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{\n", name));
+            rust_code.push_str(&format!(
+                "#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{\n",
+                name
+            ));
             rust_code.push_str("    // Auto-generated function implementation\n");
             rust_code.push_str("    Ok(py.None())\n");
             rust_code.push_str("}\n\n");
@@ -101,20 +109,22 @@ pub fn generate_cargo_toml(module_name: &str, optimize_level: u8) -> String {
     cargo_toml.push_str(&format!("strip = true\n\n"));
 
     cargo_toml.push_str(&format!("[dependencies]\n"));
-    cargo_toml.push_str(&format!("pyo3 = {{ version = \"0.19\", features = [\"extension-module\"] }}\n"));
+    cargo_toml.push_str(&format!(
+        "pyo3 = {{ version = \"0.19\", features = [\"extension-module\"] }}\n"
+    ));
 
     // Add optimization flags
     cargo_toml.push_str(&format!("\n[profile.release]\n"));
     match optimize_level {
         0 => {
             cargo_toml.push_str(&format!("opt-level = 0\n"));
-        },
+        }
         1 => {
             cargo_toml.push_str(&format!("opt-level = 1\n"));
-        },
+        }
         2 => {
             cargo_toml.push_str(&format!("opt-level = 2\n"));
-        },
+        }
         _ => {
             cargo_toml.push_str(&format!("opt-level = 3\n"));
             cargo_toml.push_str(&format!("lto = true\n"));
@@ -126,10 +136,7 @@ pub fn generate_cargo_toml(module_name: &str, optimize_level: u8) -> String {
 }
 
 /// Transform a Python file into a Rust project
-pub fn transform_file(
-    input_path: &Path,
-    optimize_level: u8,
-) -> Result<TransformedModule> {
+pub fn transform_file(input_path: &Path, optimize_level: u8) -> Result<TransformedModule> {
     info!("Transforming Python file: {}", input_path.display());
 
     // Parse the Python file
@@ -150,8 +157,7 @@ pub fn transform_file(
     let cargo_toml = generate_cargo_toml(module_name, optimize_level);
 
     // Create a temporary directory for the build
-    let temp_dir = tempfile::tempdir()
-        .with_context(|| "Failed to create temporary directory")?;
+    let temp_dir = tempfile::tempdir().with_context(|| "Failed to create temporary directory")?;
     let build_dir = temp_dir.path().to_path_buf();
     // We'll let the temp_dir be dropped, which will clean up the directory
     // In a real implementation, we might want to keep it for debugging

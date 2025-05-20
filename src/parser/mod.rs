@@ -35,7 +35,7 @@ pub fn extract_functions(ast: &ast::Suite) -> Vec<&ast::Stmt> {
         match &stmt.node {
             ast::StmtKind::FunctionDef { .. } => {
                 functions.push(stmt);
-            },
+            }
             _ => {}
         }
     }
@@ -52,7 +52,7 @@ pub fn extract_classes(ast: &ast::Suite) -> Vec<&ast::Stmt> {
         match &stmt.node {
             ast::StmtKind::ClassDef { .. } => {
                 classes.push(stmt);
-            },
+            }
             _ => {}
         }
     }
@@ -69,7 +69,7 @@ pub fn extract_imports(ast: &ast::Suite) -> Vec<&ast::Stmt> {
         match &stmt.node {
             ast::StmtKind::Import { .. } => {
                 imports.push(stmt);
-            },
+            }
             _ => {}
         }
     }
@@ -86,7 +86,7 @@ pub fn extract_from_imports(ast: &ast::Suite) -> Vec<&ast::Stmt> {
         match &stmt.node {
             ast::StmtKind::ImportFrom { .. } => {
                 imports.push(stmt);
-            },
+            }
             _ => {}
         }
     }
@@ -103,7 +103,7 @@ pub fn extract_module_vars(ast: &ast::Suite) -> Vec<&ast::Stmt> {
         match &stmt.node {
             ast::StmtKind::Assign { .. } => {
                 vars.push(stmt);
-            },
+            }
             _ => {}
         }
     }

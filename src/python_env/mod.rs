@@ -12,17 +12,19 @@ use std::sync::Mutex;
 use which::which;
 use zip::ZipArchive;
 
-mod version;
 mod cleanup;
-pub use version::create_venv_with_uv_and_version;
+mod version;
 pub use cleanup::{cleanup_venv, get_venv_path};
+pub use version::create_venv_with_uv_and_version;
 
 // UV tool URLs and versions
 const UV_VERSION: &str = "0.7.6";
-const UV_WINDOWS_URL: &str = "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
+const UV_WINDOWS_URL: &str =
+    "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
 
 // Global state for Python environment
-static PYTHON_ENV: Lazy<Mutex<PythonEnvironment>> = Lazy::new(|| Mutex::new(PythonEnvironment::new()));
+static PYTHON_ENV: Lazy<Mutex<PythonEnvironment>> =
+    Lazy::new(|| Mutex::new(PythonEnvironment::new()));
 
 /// Represents a Python environment configuration
 pub struct PythonEnvironment {
@@ -45,7 +47,10 @@ impl PythonEnvironment {
 }
 
 /// Initialize the Python environment with the given configuration
-pub fn initialize_python_env(python_path: Option<&str>, python_version: Option<&str>) -> Result<()> {
+pub fn initialize_python_env(
+    python_path: Option<&str>,
+    python_version: Option<&str>,
+) -> Result<()> {
     let mut env = PYTHON_ENV.lock().unwrap();
 
     if env.initialized {
@@ -163,7 +168,9 @@ fn is_python3_version(version_str: &str) -> Result<bool> {
 
     if let Some(captures) = VERSION_REGEX.captures(version_str) {
         if let Some(major_version) = captures.get(1) {
-            let major_version = major_version.as_str().parse::<u32>()
+            let major_version = major_version
+                .as_str()
+                .parse::<u32>()
                 .with_context(|| format!("Failed to parse Python version: {}", version_str))?;
             return Ok(major_version >= 3);
         }
@@ -219,8 +226,7 @@ fn setup_uv() -> Result<PathBuf> {
 
 /// Get the directory where uv should be installed
 fn get_uv_dir() -> Result<PathBuf> {
-    let data_dir = dirs::data_dir()
-        .ok_or_else(|| anyhow!("Failed to determine data directory"))?;
+    let data_dir = dirs::data_dir().ok_or_else(|| anyhow!("Failed to determine data directory"))?;
 
     Ok(data_dir.join("py2pyd").join("uv").join(UV_VERSION))
 }
@@ -228,16 +234,21 @@ fn get_uv_dir() -> Result<PathBuf> {
 /// Download a file from a URL
 fn download_file(url: &str, dest: &Path) -> Result<()> {
     let client = Client::new();
-    let mut response = client.get(url)
+    let mut response = client
+        .get(url)
         .send()
         .with_context(|| format!("Failed to download from {}", url))?;
 
     if !response.status().is_success() {
-        return Err(anyhow!("Failed to download from {}: {}", url, response.status()));
+        return Err(anyhow!(
+            "Failed to download from {}: {}",
+            url,
+            response.status()
+        ));
     }
 
-    let mut file = File::create(dest)
-        .with_context(|| format!("Failed to create file: {}", dest.display()))?;
+    let mut file =
+        File::create(dest).with_context(|| format!("Failed to create file: {}", dest.display()))?;
 
     copy(&mut response, &mut file)
         .with_context(|| format!("Failed to write to file: {}", dest.display()))?;
@@ -254,7 +265,8 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
         .with_context(|| format!("Failed to read zip file: {}", zip_path.display()))?;
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)
+        let mut file = archive
+            .by_index(i)
             .with_context(|| format!("Failed to read file {} in zip", i))?;
 
         let outpath = dest_dir.join(file.name());
@@ -265,8 +277,9 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
         } else {
             if let Some(parent) = outpath.parent() {
                 if !parent.exists() {
-                    fs::create_dir_all(parent)
-                        .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+                    fs::create_dir_all(parent).with_context(|| {
+                        format!("Failed to create directory: {}", parent.display())
+                    })?;
                 }
             }
 
@@ -287,7 +300,10 @@ fn create_venv_with_uv(uv_path: &Path) -> Result<PathBuf> {
 
     // Check if the virtual environment already exists
     if venv_dir.exists() {
-        debug!("Virtual environment already exists at {}", venv_dir.display());
+        debug!(
+            "Virtual environment already exists at {}",
+            venv_dir.display()
+        );
         return Ok(venv_dir);
     }
 
@@ -321,14 +337,16 @@ fn create_venv_with_uv(uv_path: &Path) -> Result<PathBuf> {
         }
     }
 
-    info!("Virtual environment created successfully at {}", venv_dir.display());
+    info!(
+        "Virtual environment created successfully at {}",
+        venv_dir.display()
+    );
     Ok(venv_dir)
 }
 
 /// Get the directory where the virtual environment should be created
 fn get_venv_dir() -> Result<PathBuf> {
-    let data_dir = dirs::data_dir()
-        .ok_or_else(|| anyhow!("Failed to determine data directory"))?;
+    let data_dir = dirs::data_dir().ok_or_else(|| anyhow!("Failed to determine data directory"))?;
 
     Ok(data_dir.join("py2pyd").join("venv"))
 }
@@ -342,7 +360,9 @@ fn get_python_from_venv(venv_dir: &Path) -> Result<PathBuf> {
     };
 
     if !python_path.exists() {
-        return Err(anyhow!("Python interpreter not found in virtual environment"));
+        return Err(anyhow!(
+            "Python interpreter not found in virtual environment"
+        ));
     }
 
     Ok(python_path)
@@ -355,7 +375,8 @@ pub fn install_package(package: &str) -> Result<()> {
 
     // Get Python path for environment variables
     let python_path = get_python_path()?;
-    let python_dir = python_path.parent()
+    let python_dir = python_path
+        .parent()
         .ok_or_else(|| anyhow!("Failed to determine Python directory"))?;
 
     info!("Installing package: {}", package);
@@ -399,7 +420,10 @@ pub fn set_python_env_vars() -> Result<()> {
 
     // Test if Python can import basic modules
     let output = Command::new(&python_path)
-        .args(&["-c", "import sys; import os; print('Python is working correctly')"])
+        .args(&[
+            "-c",
+            "import sys; import os; print('Python is working correctly')",
+        ])
         .output()
         .with_context(|| "Failed to test Python")?;
 

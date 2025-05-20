@@ -35,27 +35,27 @@ impl BuildTools {
     /// Get a string representation of the available build tools
     pub fn get_tools_info(&self) -> String {
         let mut info = String::new();
-        
+
         if let Some(msvc) = &self.msvc_path {
             info.push_str(&format!("MSVC: {}\n", msvc.display()));
         }
-        
+
         if let Some(mingw) = &self.mingw_path {
             info.push_str(&format!("MinGW: {}\n", mingw.display()));
         }
-        
+
         if let Some(dlltool) = &self.dlltool_path {
             info.push_str(&format!("dlltool: {}\n", dlltool.display()));
         }
-        
+
         if let Some(vs) = &self.vs_path {
             info.push_str(&format!("Visual Studio: {}\n", vs.display()));
         }
-        
+
         if info.is_empty() {
             info.push_str("No build tools found");
         }
-        
+
         info
     }
 }
@@ -68,13 +68,13 @@ pub fn detect_build_tools() -> Result<BuildTools> {
         dlltool_path: None,
         vs_path: None,
     };
-    
+
     // Detect MSVC
     match which("cl") {
         Ok(path) => {
             debug!("Found MSVC compiler: {}", path.display());
             tools.msvc_path = Some(path);
-            
+
             // Try to find Visual Studio installation
             if let Ok(output) = Command::new("cl").arg("/?").output() {
                 let output_str = String::from_utf8_lossy(&output.stdout);
@@ -84,7 +84,7 @@ pub fn detect_build_tools() -> Result<BuildTools> {
                     }
                 }
             }
-            
+
             // Try to find VS installation path
             if let Ok(output) = Command::new("where").arg("devenv.exe").output() {
                 if output.status.success() {
@@ -105,7 +105,7 @@ pub fn detect_build_tools() -> Result<BuildTools> {
             debug!("MSVC compiler not found in PATH: {}", e);
         }
     }
-    
+
     // Detect MinGW
     match which("gcc") {
         Ok(path) => {
@@ -116,7 +116,7 @@ pub fn detect_build_tools() -> Result<BuildTools> {
             debug!("MinGW compiler not found in PATH: {}", e);
         }
     }
-    
+
     // Detect dlltool
     match which("dlltool") {
         Ok(path) => {
@@ -127,7 +127,7 @@ pub fn detect_build_tools() -> Result<BuildTools> {
             debug!("dlltool not found in PATH: {}", e);
         }
     }
-    
+
     Ok(tools)
 }
 
@@ -148,7 +148,8 @@ To install the required build tools on Windows, you have two options:
    - Restart your terminal after installation
 
 After installation, try running py2pyd again.
-"#.to_string()
+"#
+        .to_string()
     } else {
         r#"
 To install the required build tools on Linux/macOS:
@@ -161,14 +162,15 @@ To install the required build tools on Linux/macOS:
    xcode-select --install
 
 After installation, try running py2pyd again.
-"#.to_string()
+"#
+        .to_string()
     }
 }
 
 /// Check if build tools are available and provide helpful error messages
 pub fn check_build_tools() -> Result<BuildTools> {
     let tools = detect_build_tools()?;
-    
+
     if !tools.has_any_tools() {
         let instructions = get_build_tools_installation_instructions();
         return Err(anyhow!(
@@ -176,6 +178,6 @@ pub fn check_build_tools() -> Result<BuildTools> {
             instructions
         ));
     }
-    
+
     Ok(tools)
 }

@@ -8,10 +8,10 @@ mod build_tools;
 
 mod compiler;
 mod parser;
-mod transformer;
 mod python_env;
-mod uv_env;
+mod transformer;
 mod uv_compiler;
+mod uv_env;
 
 /// A tool to compile Python modules to pyd files
 #[derive(Parser)]
@@ -57,8 +57,6 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
 
-
-
         /// Optimization level (0-3)
         #[arg(short = 'O', long, default_value = "2")]
         optimize: u8,
@@ -72,8 +70,6 @@ enum Commands {
         /// Output directory
         #[arg(short, long)]
         output: PathBuf,
-
-
 
         /// Optimization level (0-3)
         #[arg(short = 'O', long, default_value = "2")]
@@ -99,8 +95,8 @@ fn main() -> Result<()> {
 
     // Check for required build tools
     info!("Checking for required build tools...");
-    let build_tools = build_tools::check_build_tools()
-        .with_context(|| "Failed to check build tools")?;
+    let build_tools =
+        build_tools::check_build_tools().with_context(|| "Failed to check build tools")?;
 
     info!("Build tools found:\n{}", build_tools.get_tools_info());
 
@@ -131,8 +127,14 @@ fn main() -> Result<()> {
             info!("Optimization level: {}", optimize);
 
             // Parse additional packages
-            let packages = cli.packages.as_ref()
-                .map(|p| p.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>())
+            let packages = cli
+                .packages
+                .as_ref()
+                .map(|p| {
+                    p.split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
 
             if cli.use_uv {
@@ -152,16 +154,19 @@ fn main() -> Result<()> {
                 // Use the old compiler
                 // Initialize Python environment
                 info!("Initializing Python environment...");
-                python_env::initialize_python_env(cli.python_path.as_deref(), cli.python_version.as_deref())
-                    .with_context(|| "Failed to initialize Python environment")?;
+                python_env::initialize_python_env(
+                    cli.python_path.as_deref(),
+                    cli.python_version.as_deref(),
+                )
+                .with_context(|| "Failed to initialize Python environment")?;
 
                 // Set Python environment variables
                 python_env::set_python_env_vars()
                     .with_context(|| "Failed to set Python environment variables")?;
 
                 // Display Python path
-                let python_path = python_env::get_python_path()
-                    .with_context(|| "Failed to get Python path")?;
+                let python_path =
+                    python_env::get_python_path().with_context(|| "Failed to get Python path")?;
                 info!("Using Python interpreter: {}", python_path.display());
 
                 compile_file(input, &output, *optimize)
@@ -178,7 +183,10 @@ fn main() -> Result<()> {
                 } else {
                     let venv_path = python_env::get_venv_path()?;
                     info!("Keeping virtual environment at: {}", venv_path.display());
-                    info!("You can activate it with: {}\\Scripts\\activate", venv_path.display());
+                    info!(
+                        "You can activate it with: {}\\Scripts\\activate",
+                        venv_path.display()
+                    );
                 }
             }
 
@@ -194,8 +202,14 @@ fn main() -> Result<()> {
             info!("Optimization level: {}", optimize);
 
             // Parse additional packages
-            let packages = cli.packages.as_ref()
-                .map(|p| p.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>())
+            let packages = cli
+                .packages
+                .as_ref()
+                .map(|p| {
+                    p.split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
 
             if cli.use_uv {
@@ -215,16 +229,19 @@ fn main() -> Result<()> {
                 // Use the old compiler
                 // Initialize Python environment
                 info!("Initializing Python environment...");
-                python_env::initialize_python_env(cli.python_path.as_deref(), cli.python_version.as_deref())
-                    .with_context(|| "Failed to initialize Python environment")?;
+                python_env::initialize_python_env(
+                    cli.python_path.as_deref(),
+                    cli.python_version.as_deref(),
+                )
+                .with_context(|| "Failed to initialize Python environment")?;
 
                 // Set Python environment variables
                 python_env::set_python_env_vars()
                     .with_context(|| "Failed to set Python environment variables")?;
 
                 // Display Python path
-                let python_path = python_env::get_python_path()
-                    .with_context(|| "Failed to get Python path")?;
+                let python_path =
+                    python_env::get_python_path().with_context(|| "Failed to get Python path")?;
                 info!("Using Python interpreter: {}", python_path.display());
 
                 batch_compile(input, output, *optimize, *recursive)
@@ -241,7 +258,10 @@ fn main() -> Result<()> {
                 } else {
                     let venv_path = python_env::get_venv_path()?;
                     info!("Keeping virtual environment at: {}", venv_path.display());
-                    info!("You can activate it with: {}\\Scripts\\activate", venv_path.display());
+                    info!(
+                        "You can activate it with: {}\\Scripts\\activate",
+                        venv_path.display()
+                    );
                 }
             }
 
