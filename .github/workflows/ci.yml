@@ -1,0 +1,280 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  CARGO_INCREMENTAL: "0"
+  SCCACHE_CACHE_SIZE: "2G"
+  CARGO_BUILD_JOBS: "4"
+
+jobs:
+  build-windows:
+    name: Build and Test (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint with clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+      - name: Run tests
+        run: cargo test --release
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Test with Python environment
+        run: |
+          # Create a simple Python file for testing
+          echo "def hello(): return 'Hello, World!'" > test_module.py
+
+          # Test with explicit output path
+          ./target/release/py2pyd.exe compile -i test_module.py -o explicit_output.pyd -O 2
+
+          # Verify the explicit output file exists
+          if (Test-Path explicit_output.pyd) {
+            echo "Successfully compiled test_module.py to explicit_output.pyd"
+          } else {
+            echo "Failed to compile test_module.py with explicit output path"
+            exit 1
+          }
+
+          # Test with default output path (should be in current directory)
+          ./target/release/py2pyd.exe compile -i test_module.py -O 2
+
+          # Verify the default output file exists in current directory
+          if (Test-Path test_module.pyd) {
+            echo "Successfully compiled test_module.py to test_module.pyd in current directory"
+          } else {
+            echo "Failed to compile test_module.py with default output path"
+            exit 1
+          }
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: py2pyd-windows
+          path: target/release/py2pyd.exe
+          if-no-files-found: error
+
+  build-linux:
+    name: Build and Test (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev python3-pip python3-setuptools python3-wheel gcc g++ pkg-config libssl-dev
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+      - name: Run tests
+        run: cargo test --release
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Test with Python environment
+        run: |
+          # Create a simple Python file for testing
+          echo "def hello(): return 'Hello, World!'" > test_module.py
+
+          # Test with explicit output path
+          ./target/release/py2pyd compile -i test_module.py -o explicit_output.so -O 2
+
+          # Verify the explicit output file exists
+          if [ -f explicit_output.so ]; then
+            echo "Successfully compiled test_module.py to explicit_output.so"
+          else
+            echo "Failed to compile test_module.py with explicit output path"
+            exit 1
+          fi
+
+          # Test with default output path (should be in current directory)
+          ./target/release/py2pyd compile -i test_module.py -O 2
+
+          # Verify the default output file exists in current directory
+          if [ -f test_module.so ]; then
+            echo "Successfully compiled test_module.py to test_module.so in current directory"
+          else
+            echo "Failed to compile test_module.py with default output path"
+            exit 1
+          fi
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: py2pyd-linux
+          path: target/release/py2pyd
+          if-no-files-found: error
+
+  build-macos:
+    name: Build and Test (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Install macOS build dependencies
+        run: |
+          echo "Installing macOS build dependencies..."
+          # Install C compiler and development tools
+          brew install gcc
+          # Ensure Xcode Command Line Tools are set up
+          xcode-select -p || sudo xcode-select --reset
+          # Install Python development headers
+          brew install python-tk
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+      - name: Run tests
+        run: cargo test --release
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Test with Python environment
+        run: |
+          # Create a simple Python file for testing
+          echo "def hello(): return 'Hello, World!'" > test_module.py
+
+          # Test with explicit output path
+          ./target/release/py2pyd compile -i test_module.py -o explicit_output.so -O 2
+
+          # Verify the explicit output file exists
+          if [ -f explicit_output.so ]; then
+            echo "Successfully compiled test_module.py to explicit_output.so"
+          else
+            echo "Failed to compile test_module.py with explicit output path"
+            exit 1
+          fi
+
+          # Test with default output path (should be in current directory)
+          ./target/release/py2pyd compile -i test_module.py -O 2
+
+          # Verify the default output file exists in current directory
+          if [ -f test_module.so ]; then
+            echo "Successfully compiled test_module.py to test_module.so in current directory"
+          else
+            echo "Failed to compile test_module.py with default output path"
+            exit 1
+          fi
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: py2pyd-macos
+          path: target/release/py2pyd
+          if-no-files-found: error

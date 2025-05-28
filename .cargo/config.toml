@@ -1,0 +1,29 @@
+[build]
+# Use sccache for faster builds
+# rustc-wrapper = "sccache"
+
+# Enable parallel compilation
+jobs = 8
+
+# Enable incremental compilation
+incremental = true
+
+[target.x86_64-pc-windows-msvc]
+# Use link-time optimization for release builds
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-unknown-linux-gnu]
+# Use link-time optimization for release builds
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-apple-darwin]
+# Use link-time optimization for release builds
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[profile.release]
+# Enable link-time optimization
+lto = "thin"
+# Enable codegen units for faster parallel compilation
+codegen-units = 16
+# Optimize for size
+opt-level = "s"
