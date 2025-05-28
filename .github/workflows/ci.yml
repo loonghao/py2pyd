@@ -8,11 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
   CARGO_INCREMENTAL: "0"
-  SCCACHE_CACHE_SIZE: "2G"
-  CARGO_BUILD_JOBS: "4"
 
 jobs:
   build-windows:
@@ -27,32 +23,22 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Check code formatting
         run: cargo fmt --all -- --check
 
       - name: Build
         run: cargo build --release
-
-      - name: Show sccache stats
-        run: sccache --show-stats
 
       - name: Run tests
         run: cargo test --release
@@ -113,31 +99,21 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev python3-pip python3-setuptools python3-wheel gcc g++ pkg-config libssl-dev
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Build
         run: cargo build --release
-
-      - name: Show sccache stats
-        run: sccache --show-stats
 
       - name: Run tests
         run: cargo test --release
@@ -198,9 +174,6 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-
       - name: Install macOS build dependencies
         run: |
           echo "Installing macOS build dependencies..."
@@ -211,23 +184,16 @@ jobs:
           # Install Python development headers
           brew install python-tk
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Build
         run: cargo build --release
-
-      - name: Show sccache stats
-        run: sccache --show-stats
 
       - name: Run tests
         run: cargo test --release
