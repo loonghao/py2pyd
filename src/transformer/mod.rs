@@ -38,18 +38,18 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
 
     // Transform functions
     for func in crate::parser::extract_functions(ast) {
-        if let ast::StmtKind::FunctionDef { name, .. } = &func.node {
+        if let ast::Stmt::FunctionDef(func_def) = func {
             rust_code.push_str(&format!(
                 "    m.add_function(wrap_pyfunction!({}, m)?)?;\n",
-                name
+                func_def.name
             ));
         }
     }
 
     // Transform classes
     for class in crate::parser::extract_classes(ast) {
-        if let ast::StmtKind::ClassDef { name, .. } = &class.node {
-            rust_code.push_str(&format!("    m.add_class::<{}>()?;\n", name));
+        if let ast::Stmt::ClassDef(class_def) = class {
+            rust_code.push_str(&format!("    m.add_class::<{}>()?;\n", class_def.name));
         }
     }
 
@@ -58,10 +58,10 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
 
     // Generate function implementations
     for func in crate::parser::extract_functions(ast) {
-        if let ast::StmtKind::FunctionDef { name, .. } = &func.node {
+        if let ast::Stmt::FunctionDef(func_def) = func {
             rust_code.push_str(&format!(
                 "#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{\n",
-                name
+                func_def.name
             ));
             rust_code.push_str("    // Auto-generated function implementation\n");
             rust_code.push_str("    Ok(py.None())\n");
@@ -71,15 +71,15 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
 
     // Generate class implementations
     for class in crate::parser::extract_classes(ast) {
-        if let ast::StmtKind::ClassDef { name, .. } = &class.node {
-            rust_code.push_str(&format!("#[pyclass]\nstruct {} {{\n", name));
+        if let ast::Stmt::ClassDef(class_def) = class {
+            rust_code.push_str(&format!("#[pyclass]\nstruct {} {{\n", class_def.name));
             rust_code.push_str("    // Auto-generated class implementation\n");
             rust_code.push_str("}\n\n");
 
-            rust_code.push_str(&format!("#[pymethods]\nimpl {} {{\n", name));
+            rust_code.push_str(&format!("#[pymethods]\nimpl {} {{\n", class_def.name));
             rust_code.push_str("    #[new]\n");
             rust_code.push_str("    fn new() -> Self {\n");
-            rust_code.push_str(&format!("        {}{{ }}\n", name));
+            rust_code.push_str(&format!("        {}{{ }}\n", class_def.name));
             rust_code.push_str("    }\n");
             rust_code.push_str("}\n\n");
         }

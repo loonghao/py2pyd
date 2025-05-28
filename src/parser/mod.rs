@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use log::{debug, info};
-use rustpython_parser::{ast, parser};
+use rustpython_parser::{ast, Parse};
 use std::fs;
 use std::path::Path;
 
@@ -19,8 +19,8 @@ pub fn parse_file(path: &Path) -> Result<ast::Suite> {
 pub fn parse_source(source: &str) -> Result<ast::Suite> {
     debug!("Parsing Python source code");
 
-    // Use a dummy file name for the source path
-    let ast = parser::parse_program(source, "<string>")
+    // Use the new Parse trait from rustpython-parser 0.4
+    let ast = ast::Suite::parse(source, "<string>")
         .map_err(|e| anyhow::anyhow!("Python parsing error: {}", e))?;
 
     debug!("Successfully parsed Python source code");
@@ -32,8 +32,8 @@ pub fn extract_functions(ast: &ast::Suite) -> Vec<&ast::Stmt> {
     let mut functions = Vec::new();
 
     for stmt in ast {
-        match &stmt.node {
-            ast::StmtKind::FunctionDef { .. } => {
+        match stmt {
+            ast::Stmt::FunctionDef(_) => {
                 functions.push(stmt);
             }
             _ => {}
@@ -49,8 +49,8 @@ pub fn extract_classes(ast: &ast::Suite) -> Vec<&ast::Stmt> {
     let mut classes = Vec::new();
 
     for stmt in ast {
-        match &stmt.node {
-            ast::StmtKind::ClassDef { .. } => {
+        match stmt {
+            ast::Stmt::ClassDef(_) => {
                 classes.push(stmt);
             }
             _ => {}
@@ -66,8 +66,8 @@ pub fn extract_imports(ast: &ast::Suite) -> Vec<&ast::Stmt> {
     let mut imports = Vec::new();
 
     for stmt in ast {
-        match &stmt.node {
-            ast::StmtKind::Import { .. } => {
+        match stmt {
+            ast::Stmt::Import(_) => {
                 imports.push(stmt);
             }
             _ => {}
@@ -83,8 +83,8 @@ pub fn extract_from_imports(ast: &ast::Suite) -> Vec<&ast::Stmt> {
     let mut imports = Vec::new();
 
     for stmt in ast {
-        match &stmt.node {
-            ast::StmtKind::ImportFrom { .. } => {
+        match stmt {
+            ast::Stmt::ImportFrom(_) => {
                 imports.push(stmt);
             }
             _ => {}
@@ -100,8 +100,8 @@ pub fn extract_module_vars(ast: &ast::Suite) -> Vec<&ast::Stmt> {
     let mut vars = Vec::new();
 
     for stmt in ast {
-        match &stmt.node {
-            ast::StmtKind::Assign { .. } => {
+        match stmt {
+            ast::Stmt::Assign(_) => {
                 vars.push(stmt);
             }
             _ => {}
