@@ -24,10 +24,11 @@ jobs:
       - name: Check code formatting
         run: cargo fmt --all -- --check
 
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+
       - name: Check for security vulnerabilities
-        uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo audit
 
   docs:
     name: Documentation
