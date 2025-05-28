@@ -299,8 +299,8 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
 /// Generate a setup.py file for building the extension module
 fn generate_setup_py(
     module_name: &str,
-    _source_code: &str,  // Unused but kept for potential future use
-    _config: &CompileConfig,  // Unused but kept for potential future use
+    _source_code: &str,      // Unused but kept for potential future use
+    _config: &CompileConfig, // Unused but kept for potential future use
 ) -> Result<String> {
     let mut setup_py = String::new();
 
