@@ -26,7 +26,25 @@ py2pyd is a command-line tool that simplifies the process of compiling Python (.
 
 ## Installation
 
-*Installation instructions will be provided once the project reaches a stable release.*
+### Download Pre-built Binaries
+
+Download the latest release from the [Releases page](https://github.com/loonghao/py2pyd/releases).
+
+Available platforms:
+- **Windows**: `py2pyd-windows-x86_64.zip`
+- **Linux**: `py2pyd-linux-x86_64.tar.gz`
+- **macOS (Intel)**: `py2pyd-macos-x86_64.tar.gz`
+- **macOS (ARM)**: `py2pyd-macos-aarch64.tar.gz`
+
+### Build from Source
+
+```bash
+git clone https://github.com/loonghao/py2pyd.git
+cd py2pyd
+cargo build --release
+```
+
+The binary will be available at `target/release/py2pyd` (or `py2pyd.exe` on Windows).
 
 ## Usage
 
@@ -85,6 +103,29 @@ The tool will automatically check for required build tools and provide installat
   - [ ] Investigate embedded Python interpreter option
   - [x] Support for additional platforms (Linux, macOS)
   - [ ] Performance optimizations
+
+## Release Process
+
+This project uses automated CI/CD for releases. When the version in `Cargo.toml` is updated and pushed to the main branch, the system automatically:
+
+1. **Detects version changes** and creates a Git tag
+2. **Builds binaries** for all supported platforms
+3. **Creates a GitHub release** with binary artifacts
+4. **Generates release notes** from commit messages
+
+### For Maintainers
+
+Use the provided helper scripts to create releases:
+
+```bash
+# Windows
+.\scripts\release.ps1 1.0.0 "Release message"
+
+# Linux/macOS
+./scripts/release.sh 1.0.0 "Release message"
+```
+
+For detailed information, see [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Contributing
 
