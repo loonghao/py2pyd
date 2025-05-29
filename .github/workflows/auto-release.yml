@@ -1,23 +1,51 @@
-name: Manual Release
+name: Auto Release
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to release'
-        required: true
-        type: string
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/**'
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
 
 jobs:
-  build-release:
-    name: Build Release
+  check-version:
+    name: Check Version Change
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_changed: ${{ steps.version.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current version
+        id: version
+        run: |
+          # Get version from Cargo.toml
+          CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this version tag already exists
+          if git tag -l "v$CURRENT_VERSION" | grep -q "v$CURRENT_VERSION"; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version v$CURRENT_VERSION already exists"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "New version v$CURRENT_VERSION detected"
+          fi
+
+  build-and-release:
+    name: Build and Release
+    needs: check-version
+    if: needs.check-version.outputs.version_changed == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -88,7 +116,7 @@ jobs:
             zip -r ${{ matrix.asset_name }} release/
           fi
 
-      - name: Upload Release Asset
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
@@ -97,7 +125,8 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [build-release]
+    needs: [check-version, build-and-release]
+    if: needs.check-version.outputs.version_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -107,11 +136,18 @@ jobs:
         with:
           path: artifacts
 
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ needs.check-version.outputs.version }}
+          git push origin ${{ needs.check-version.outputs.version }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: Release ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ needs.check-version.outputs.version }}
+          name: Release ${{ needs.check-version.outputs.version }}
           files: |
             artifacts/x86_64-pc-windows-msvc/py2pyd-windows-x86_64.zip
             artifacts/x86_64-unknown-linux-gnu/py2pyd-linux-x86_64.tar.gz
