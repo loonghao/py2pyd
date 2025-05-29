@@ -106,30 +106,85 @@ The tool will automatically check for required build tools and provide installat
 
 ## Release Process
 
-This project uses automated CI/CD for releases. When the version in `Cargo.toml` is updated and pushed to the main branch, the system automatically:
+This project uses **Semantic Release** with automated CI/CD. Releases are automatically triggered based on [Conventional Commits](https://www.conventionalcommits.org/):
 
-1. **Detects version changes** and creates a Git tag
-2. **Builds binaries** for all supported platforms
-3. **Creates a GitHub release** with binary artifacts
-4. **Generates release notes** from commit messages
+### Automatic Version Bumping
 
-### For Maintainers
+| Commit Type | Version Bump | Example |
+|-------------|--------------|---------|
+| `feat:` | Minor (0.1.0 → 0.2.0) | `feat: add Python 3.12 support` |
+| `fix:` | Patch (0.1.0 → 0.1.1) | `fix: resolve memory leak in parser` |
+| `feat!:` or `BREAKING CHANGE:` | Major (0.1.0 → 1.0.0) | `feat!: redesign command-line interface` |
+| `docs:`, `chore:`, etc. | Patch (0.1.0 → 0.1.1) | `docs: update installation guide` |
 
-Use the provided helper scripts to create releases:
+### How to Release
+
+Simply use conventional commit messages when pushing to main:
 
 ```bash
-# Windows
-.\scripts\release.ps1 1.0.0 "Release message"
+# Feature addition (minor version bump)
+git commit -m "feat: add support for Python 3.12"
 
-# Linux/macOS
-./scripts/release.sh 1.0.0 "Release message"
+# Bug fix (patch version bump)
+git commit -m "fix: handle edge case in file parsing"
+
+# Breaking change (major version bump)
+git commit -m "feat!: redesign command-line interface
+
+BREAKING CHANGE: The --input flag is now required"
 ```
 
-For detailed information, see [docs/RELEASE.md](docs/RELEASE.md).
+The CI system will automatically:
+1. **Analyze commit messages** to determine version bump
+2. **Update version** in `Cargo.toml`
+3. **Build binaries** for all supported platforms
+4. **Create Git tag** and GitHub release
+5. **Upload artifacts** with generated release notes
+
+For detailed information, see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please follow these guidelines:
+
+### Commit Message Format
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/). Please format your commit messages as:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Types:**
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `perf`: A code change that improves performance
+- `test`: Adding missing tests or correcting existing tests
+- `chore`: Changes to the build process or auxiliary tools
+
+**Examples:**
+```bash
+feat(parser): add support for async functions
+fix(compiler): resolve segmentation fault on Windows
+docs(readme): add installation instructions
+refactor(core): simplify error handling logic
+```
+
+### Pull Request Process
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes using conventional commits
+4. Submit a pull request
+
+Please feel free to submit a Pull Request!
 
 ## License
 
