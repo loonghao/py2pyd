@@ -18,6 +18,10 @@ path = "src/main.rs"
 name = "turbo_cdn_test"
 path = "examples/turbo_cdn_test.rs"
 
+[[example]]
+name = "test_runner"
+path = "examples/test_runner.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
