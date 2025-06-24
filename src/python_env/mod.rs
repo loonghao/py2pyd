@@ -12,6 +12,8 @@ use std::sync::Mutex;
 use which::which;
 use zip::ZipArchive;
 
+use crate::turbo_downloader::smart_download_file;
+
 mod cleanup;
 mod version;
 pub use cleanup::{cleanup_venv, get_venv_path};
@@ -205,10 +207,10 @@ fn setup_uv() -> Result<PathBuf> {
     fs::create_dir_all(&uv_dir)
         .with_context(|| format!("Failed to create directory: {}", uv_dir.display()))?;
 
-    // Download uv
+    // Download uv using turbo-cdn
     info!("Downloading uv v{} from {}", UV_VERSION, UV_WINDOWS_URL);
     let zip_path = uv_dir.join("uv.zip");
-    download_file(UV_WINDOWS_URL, &zip_path)
+    smart_download_file(UV_WINDOWS_URL, &zip_path)
         .with_context(|| format!("Failed to download uv from {}", UV_WINDOWS_URL))?;
 
     // Extract uv
@@ -231,29 +233,10 @@ fn get_uv_dir() -> Result<PathBuf> {
     Ok(data_dir.join("py2pyd").join("uv").join(UV_VERSION))
 }
 
-/// Download a file from a URL
+/// Download a file from a URL (legacy function, now uses turbo-cdn)
 fn download_file(url: &str, dest: &Path) -> Result<()> {
-    let client = Client::new();
-    let mut response = client
-        .get(url)
-        .send()
-        .with_context(|| format!("Failed to download from {}", url))?;
-
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to download from {}: {}",
-            url,
-            response.status()
-        ));
-    }
-
-    let mut file =
-        File::create(dest).with_context(|| format!("Failed to create file: {}", dest.display()))?;
-
-    copy(&mut response, &mut file)
-        .with_context(|| format!("Failed to write to file: {}", dest.display()))?;
-
-    Ok(())
+    // Use the smart download function that tries turbo-cdn first
+    smart_download_file(url, dest)
 }
 
 /// Extract a zip file
