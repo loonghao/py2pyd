@@ -77,6 +77,30 @@ py2pyd --uv-python 3.10 -i src/ -o build/ --recursive
 
 The tool will automatically check for required build tools and provide installation instructions if they are missing.
 
+## Testing
+
+py2pyd includes comprehensive tests, including integration tests that download and compile real Python packages from PyPI.
+
+### Quick Tests
+```bash
+# Run unit tests only
+cargo test
+```
+
+### Integration Tests
+```bash
+# Run all tests including integration tests (requires internet and build tools)
+cargo test -- --ignored
+
+# Test compiling a simple Python module
+cargo test test_compile_simple_python_module -- --ignored
+
+# Test downloading and compiling a real PyPI package
+cargo test test_download_six_package -- --ignored
+```
+
+For detailed testing information, see [TESTING_GUIDE.md](TESTING_GUIDE.md).
+
 ## TODO List
 
 - [ ] Implement flexible Python interpreter discovery
