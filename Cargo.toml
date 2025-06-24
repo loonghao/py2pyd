@@ -14,6 +14,10 @@ categories = ["command-line-utilities", "development-tools"]
 name = "py2pyd"
 path = "src/main.rs"
 
+[[example]]
+name = "turbo_cdn_test"
+path = "examples/turbo_cdn_test.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
@@ -33,6 +37,8 @@ regex = "1.9"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 zip = "4.0"
 uuid = { version = "1.4", features = ["v4"] }
+turbo-cdn = "0.3.0"
+tokio = { version = "1.0", features = ["full"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

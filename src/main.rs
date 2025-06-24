@@ -21,6 +21,7 @@ mod compiler;
 mod parser;
 mod python_env;
 mod transformer;
+mod turbo_downloader;
 mod uv_compiler;
 mod uv_env;
 

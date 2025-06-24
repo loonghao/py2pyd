@@ -1,0 +1,37 @@
+[workspace]
+# Enable automatic changelog generation
+changelog_update = true
+# Enable GitHub releases for the main package
+git_release_enable = true
+# Enable automatic tag creation
+git_tag_enable = true
+# Enable processing for releases
+release = true
+
+# Changelog configuration
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+
+# Package-specific configuration for turbo-cdn
+[[package]]
+name = "turbo-cdn"
+# Enable changelog updates
+changelog_update = true
+# Enable GitHub releases for the main package
+git_release_enable = true
+# Enable processing for releases
+release = true
+# Standard tag format (triggers release workflows)
+git_tag_name = "v{{version}}"
+# Allow major version bumps for breaking changes
+allow_dirty = false
+# Ensure proper semantic versioning
+semver_check = true
