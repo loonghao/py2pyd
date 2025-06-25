@@ -13,7 +13,14 @@ permissions:
 
 jobs:
   code-quality:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1.1.3
-    with:
-      enable-coverage: false
-      enable-python-wheel: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: loonghao/rust-actions-toolkit@v1.1.6
+        with:
+          command: ci
+          rust-toolchain: stable
+          check-format: true
+          check-clippy: true
+          check-docs: true
+          clippy-args: '--all-targets --all-features -- -D warnings'
