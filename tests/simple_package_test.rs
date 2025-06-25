@@ -15,7 +15,7 @@ mod simple_package_tests {
     fn test_compile_simple_python_module() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         // Create a simple Python module
         let python_content = r#"
 """
@@ -57,22 +57,22 @@ DEFAULT_GREETING = hello_world()
 
         let python_file = test_dir.join("simple_module.py");
         fs::write(&python_file, python_content)?;
-        
+
         println!("Created test Python file: {}", python_file.display());
 
         // Compile the Python file
         let output_file = test_dir.join("simple_module.pyd");
         let result = compile_python_file_with_py2pyd(&python_file, &output_file);
-        
+
         match result {
             Ok(()) => {
                 println!("✅ Successfully compiled Python module to pyd");
                 assert!(output_file.exists(), "Output pyd file should exist");
-                
+
                 // Check file size (should be > 0)
                 let metadata = fs::metadata(&output_file)?;
                 assert!(metadata.len() > 0, "Output file should not be empty");
-                
+
                 println!("Compiled file size: {} bytes", metadata.len());
             }
             Err(e) => {
@@ -91,7 +91,7 @@ DEFAULT_GREETING = hello_world()
     fn test_compile_python_with_imports() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         // Create a Python module that uses standard library imports
         let python_content = r#"
 """
@@ -155,18 +155,21 @@ class DataProcessor:
 
         let python_file = test_dir.join("module_with_imports.py");
         fs::write(&python_file, python_content)?;
-        
-        println!("Created Python file with imports: {}", python_file.display());
+
+        println!(
+            "Created Python file with imports: {}",
+            python_file.display()
+        );
 
         // Compile the Python file
         let output_file = test_dir.join("module_with_imports.pyd");
         let result = compile_python_file_with_py2pyd(&python_file, &output_file);
-        
+
         match result {
             Ok(()) => {
                 println!("✅ Successfully compiled Python module with imports");
                 assert!(output_file.exists(), "Output pyd file should exist");
-                
+
                 let metadata = fs::metadata(&output_file)?;
                 println!("Compiled file size: {} bytes", metadata.len());
             }
@@ -185,10 +188,12 @@ class DataProcessor:
     fn test_batch_compile_multiple_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         // Create multiple Python files
         let files_to_create = vec![
-            ("math_utils.py", r#"
+            (
+                "math_utils.py",
+                r#"
 def add(a, b):
     return a + b
 
@@ -197,8 +202,11 @@ def multiply(a, b):
 
 def power(base, exp):
     return base ** exp
-"#),
-            ("string_utils.py", r#"
+"#,
+            ),
+            (
+                "string_utils.py",
+                r#"
 def reverse_string(s):
     return s[::-1]
 
@@ -207,8 +215,11 @@ def count_words(text):
 
 def capitalize_words(text):
     return ' '.join(word.capitalize() for word in text.split())
-"#),
-            ("list_utils.py", r#"
+"#,
+            ),
+            (
+                "list_utils.py",
+                r#"
 def find_max(numbers):
     return max(numbers) if numbers else None
 
@@ -217,7 +228,8 @@ def find_min(numbers):
 
 def average(numbers):
     return sum(numbers) / len(numbers) if numbers else 0
-"#),
+"#,
+            ),
         ];
 
         let mut created_files = Vec::new();
@@ -238,15 +250,21 @@ def average(numbers):
         for python_file in &created_files {
             let file_stem = python_file.file_stem().unwrap().to_string_lossy();
             let output_file = output_dir.join(format!("{}.pyd", file_stem));
-            
+
             match compile_python_file_with_py2pyd(python_file, &output_file) {
                 Ok(()) => {
-                    println!("✅ Compiled: {}", python_file.file_name().unwrap().to_string_lossy());
+                    println!(
+                        "✅ Compiled: {}",
+                        python_file.file_name().unwrap().to_string_lossy()
+                    );
                     successful_compilations += 1;
                 }
                 Err(e) => {
-                    println!("❌ Failed to compile {}: {}", 
-                        python_file.file_name().unwrap().to_string_lossy(), e);
+                    println!(
+                        "❌ Failed to compile {}: {}",
+                        python_file.file_name().unwrap().to_string_lossy(),
+                        e
+                    );
                     failed_compilations += 1;
                 }
             }
@@ -255,8 +273,10 @@ def average(numbers):
         println!("Batch compilation results:");
         println!("  ✅ Successful: {}", successful_compilations);
         println!("  ❌ Failed: {}", failed_compilations);
-        println!("  📊 Success rate: {:.1}%", 
-            (successful_compilations as f64 / created_files.len() as f64) * 100.0);
+        println!(
+            "  📊 Success rate: {:.1}%",
+            (successful_compilations as f64 / created_files.len() as f64) * 100.0
+        );
 
         Ok(())
     }
@@ -264,16 +284,23 @@ def average(numbers):
 
 /// Compile a Python file using our py2pyd tool
 fn compile_python_file_with_py2pyd(input_file: &Path, output_file: &Path) -> Result<()> {
-    println!("Compiling {} -> {}", input_file.display(), output_file.display());
+    println!(
+        "Compiling {} -> {}",
+        input_file.display(),
+        output_file.display()
+    );
 
     let output = Command::new("cargo")
         .args(&[
             "run",
             "--",
             "compile",
-            "--input", input_file.to_str().unwrap(),
-            "--output", output_file.to_str().unwrap(),
-            "--use-uv", "true",
+            "--input",
+            input_file.to_str().unwrap(),
+            "--output",
+            output_file.to_str().unwrap(),
+            "--use-uv",
+            "true",
             "--verbose",
         ])
         .output()?;
@@ -282,14 +309,17 @@ fn compile_python_file_with_py2pyd(input_file: &Path, output_file: &Path) -> Res
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         return Err(anyhow::anyhow!(
-            "py2pyd compilation failed:\nSTDOUT:\n{}\nSTDERR:\n{}", 
-            stdout, 
+            "py2pyd compilation failed:\nSTDOUT:\n{}\nSTDERR:\n{}",
+            stdout,
             stderr
         ));
     }
 
     if !output_file.exists() {
-        return Err(anyhow::anyhow!("Output file was not created: {}", output_file.display()));
+        return Err(anyhow::anyhow!(
+            "Output file was not created: {}",
+            output_file.display()
+        ));
     }
 
     // Print compilation output for debugging

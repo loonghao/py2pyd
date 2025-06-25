@@ -15,26 +15,34 @@ mod pip_download_tests {
     fn test_download_six_package() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         println!("Test directory: {}", test_dir.display());
 
         // Download the 'six' package - it's small and pure Python
         let package_info = download_and_extract_package("six", "1.16.0", test_dir)?;
-        
-        println!("Package extracted to: {}", package_info.extract_path.display());
+
+        println!(
+            "Package extracted to: {}",
+            package_info.extract_path.display()
+        );
         println!("Found {} Python files", package_info.python_files.len());
-        
+
         // Verify we found the main six.py file
-        assert!(!package_info.python_files.is_empty(), "Should find Python files");
-        
-        let six_py = package_info.python_files.iter()
+        assert!(
+            !package_info.python_files.is_empty(),
+            "Should find Python files"
+        );
+
+        let six_py = package_info
+            .python_files
+            .iter()
             .find(|f| f.file_name().unwrap().to_string_lossy() == "six.py");
-        
+
         assert!(six_py.is_some(), "Should find six.py file");
-        
+
         if let Some(six_file) = six_py {
             println!("Found six.py at: {}", six_file.display());
-            
+
             // Check file size
             let metadata = fs::metadata(six_file)?;
             println!("six.py size: {} bytes", metadata.len());
@@ -50,27 +58,27 @@ mod pip_download_tests {
     fn test_download_and_compile_package() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         println!("Test directory: {}", test_dir.display());
 
         // Download a simple package
         let package_info = download_and_extract_package("six", "1.16.0", test_dir)?;
-        
+
         // Try to compile the main Python file
         if let Some(main_file) = package_info.python_files.first() {
             println!("Attempting to compile: {}", main_file.display());
-            
+
             let output_dir = test_dir.join("compiled");
             fs::create_dir_all(&output_dir)?;
-            
+
             let file_stem = main_file.file_stem().unwrap().to_string_lossy();
             let output_file = output_dir.join(format!("{}.pyd", file_stem));
-            
+
             match compile_with_py2pyd(main_file, &output_file) {
                 Ok(()) => {
                     println!("✅ Successfully compiled {} to pyd", file_stem);
                     assert!(output_file.exists(), "Compiled file should exist");
-                    
+
                     let metadata = fs::metadata(&output_file)?;
                     println!("Compiled file size: {} bytes", metadata.len());
                 }
@@ -91,7 +99,7 @@ mod pip_download_tests {
     fn test_analyze_package_structure() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         // Download and analyze multiple packages
         let packages_to_test = vec![
             ("six", "1.16.0"),
@@ -100,21 +108,29 @@ mod pip_download_tests {
 
         for (package_name, version) in packages_to_test {
             println!("\n--- Analyzing package: {} v{} ---", package_name, version);
-            
+
             match download_and_extract_package(package_name, version, test_dir) {
                 Ok(package_info) => {
                     println!("✅ Successfully downloaded {}", package_name);
                     println!("  📁 Extract path: {}", package_info.extract_path.display());
                     println!("  🐍 Python files: {}", package_info.python_files.len());
-                    
+
                     // List all Python files
                     for (i, py_file) in package_info.python_files.iter().enumerate() {
-                        if i < 5 { // Limit output
-                            println!("    {}: {}", i + 1, py_file.file_name().unwrap().to_string_lossy());
+                        if i < 5 {
+                            // Limit output
+                            println!(
+                                "    {}: {}",
+                                i + 1,
+                                py_file.file_name().unwrap().to_string_lossy()
+                            );
                         }
                     }
                     if package_info.python_files.len() > 5 {
-                        println!("    ... and {} more files", package_info.python_files.len() - 5);
+                        println!(
+                            "    ... and {} more files",
+                            package_info.python_files.len() - 5
+                        );
                     }
                 }
                 Err(e) => {
@@ -135,7 +151,11 @@ struct PackageInfo {
 }
 
 /// Download and extract a pip package
-fn download_and_extract_package(package_name: &str, version: &str, work_dir: &Path) -> Result<PackageInfo> {
+fn download_and_extract_package(
+    package_name: &str,
+    version: &str,
+    work_dir: &Path,
+) -> Result<PackageInfo> {
     let package_spec = format!("{}=={}", package_name, version);
     let download_dir = work_dir.join(format!("download_{}", package_name));
     fs::create_dir_all(&download_dir)?;
@@ -147,14 +167,19 @@ fn download_and_extract_package(package_name: &str, version: &str, work_dir: &Pa
         .args(&[
             "download",
             "--no-deps", // Don't download dependencies
-            "--dest", download_dir.to_str().unwrap(),
+            "--dest",
+            download_dir.to_str().unwrap(),
             &package_spec,
         ])
         .output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to download package {}: {}", package_name, stderr));
+        return Err(anyhow::anyhow!(
+            "Failed to download package {}: {}",
+            package_name,
+            stderr
+        ));
     }
 
     // Find the downloaded file
@@ -162,17 +187,17 @@ fn download_and_extract_package(package_name: &str, version: &str, work_dir: &Pa
     for entry in fs::read_dir(&download_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() && (
-            path.extension().map_or(false, |ext| ext == "whl") ||
-            path.to_string_lossy().ends_with(".tar.gz")
-        ) {
+        if path.is_file()
+            && (path.extension().map_or(false, |ext| ext == "whl")
+                || path.to_string_lossy().ends_with(".tar.gz"))
+        {
             downloaded_file = Some(path);
             break;
         }
     }
 
-    let downloaded_file = downloaded_file
-        .ok_or_else(|| anyhow::anyhow!("No package file found after download"))?;
+    let downloaded_file =
+        downloaded_file.ok_or_else(|| anyhow::anyhow!("No package file found after download"))?;
 
     println!("Downloaded file: {}", downloaded_file.display());
 
@@ -180,7 +205,10 @@ fn download_and_extract_package(package_name: &str, version: &str, work_dir: &Pa
     let extract_dir = work_dir.join(format!("extracted_{}", package_name));
     fs::create_dir_all(&extract_dir)?;
 
-    if downloaded_file.extension().map_or(false, |ext| ext == "whl") {
+    if downloaded_file
+        .extension()
+        .map_or(false, |ext| ext == "whl")
+    {
         extract_wheel(&downloaded_file, &extract_dir)?;
     } else if downloaded_file.to_string_lossy().ends_with(".tar.gz") {
         extract_tar_gz(&downloaded_file, &extract_dir)?;
@@ -199,9 +227,9 @@ fn download_and_extract_package(package_name: &str, version: &str, work_dir: &Pa
 
 /// Extract a wheel file (which is just a zip file)
 fn extract_wheel(wheel_path: &Path, dest_dir: &Path) -> Result<()> {
-    use zip::ZipArchive;
     use std::fs::File;
     use std::io;
+    use zip::ZipArchive;
 
     let file = File::open(wheel_path)?;
     let mut archive = ZipArchive::new(file)?;
@@ -227,8 +255,8 @@ fn extract_wheel(wheel_path: &Path, dest_dir: &Path) -> Result<()> {
 /// Extract a tar.gz file
 fn extract_tar_gz(tar_path: &Path, dest_dir: &Path) -> Result<()> {
     use flate2::read::GzDecoder;
-    use tar::Archive;
     use std::fs::File;
+    use tar::Archive;
 
     let file = File::open(tar_path)?;
     let gz = GzDecoder::new(file);
@@ -253,7 +281,7 @@ fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> R
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_dir() {
             // Skip certain directories
             let dir_name = path.file_name().unwrap().to_string_lossy();
@@ -263,9 +291,10 @@ fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> R
         } else if path.extension().map_or(false, |ext| ext == "py") {
             // Skip test files and __init__.py for now
             let file_name = path.file_name().unwrap().to_string_lossy();
-            if !file_name.starts_with("test_") && 
-               !file_name.contains("test") && 
-               file_name != "__init__.py" {
+            if !file_name.starts_with("test_")
+                && !file_name.contains("test")
+                && file_name != "__init__.py"
+            {
                 python_files.push(path);
             }
         }
@@ -281,9 +310,12 @@ fn compile_with_py2pyd(input_file: &Path, output_file: &Path) -> Result<()> {
             "run",
             "--",
             "compile",
-            "--input", input_file.to_str().unwrap(),
-            "--output", output_file.to_str().unwrap(),
-            "--use-uv", "true",
+            "--input",
+            input_file.to_str().unwrap(),
+            "--output",
+            output_file.to_str().unwrap(),
+            "--use-uv",
+            "true",
         ])
         .output()?;
 

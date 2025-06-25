@@ -16,13 +16,13 @@ mod pip_package_tests {
         // Create a temporary directory for our test
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         println!("Test directory: {}", test_dir.display());
 
         // Test with a simple, pure Python package
         let package_name = "six"; // A simple, stable pure Python package
         let package_version = "1.16.0";
-        
+
         // Step 1: Download the package using pip
         let download_result = download_pip_package(package_name, package_version, test_dir)?;
         println!("Downloaded package to: {}", download_result.display());
@@ -30,8 +30,11 @@ mod pip_package_tests {
         // Step 2: Find Python files in the downloaded package
         let python_files = find_python_files(&download_result)?;
         println!("Found {} Python files", python_files.len());
-        
-        assert!(!python_files.is_empty(), "Should find at least one Python file");
+
+        assert!(
+            !python_files.is_empty(),
+            "Should find at least one Python file"
+        );
 
         // Step 3: Try to compile each Python file to pyd
         let output_dir = test_dir.join("compiled");
@@ -42,7 +45,7 @@ mod pip_package_tests {
 
         for python_file in &python_files {
             println!("Attempting to compile: {}", python_file.display());
-            
+
             match compile_python_file(python_file, &output_dir) {
                 Ok(pyd_path) => {
                     println!("✅ Successfully compiled to: {}", pyd_path.display());
@@ -61,7 +64,10 @@ mod pip_package_tests {
         println!("  ❌ Failed: {}", failed_compilations);
 
         // We expect at least some files to compile successfully
-        assert!(successful_compilations > 0, "At least one file should compile successfully");
+        assert!(
+            successful_compilations > 0,
+            "At least one file should compile successfully"
+        );
 
         Ok(())
     }
@@ -72,20 +78,26 @@ mod pip_package_tests {
     fn test_download_and_compile_requests_package() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_dir = temp_dir.path();
-        
+
         println!("Test directory: {}", test_dir.display());
 
         // Test with requests package (more complex, but still pure Python)
         let package_name = "requests";
         let package_version = "2.31.0";
-        
+
         let download_result = download_pip_package(package_name, package_version, test_dir)?;
         println!("Downloaded package to: {}", download_result.display());
 
         let python_files = find_python_files(&download_result)?;
-        println!("Found {} Python files in requests package", python_files.len());
-        
-        assert!(!python_files.is_empty(), "Should find Python files in requests package");
+        println!(
+            "Found {} Python files in requests package",
+            python_files.len()
+        );
+
+        assert!(
+            !python_files.is_empty(),
+            "Should find Python files in requests package"
+        );
 
         // Try to compile a few key files
         let output_dir = test_dir.join("compiled");
@@ -96,7 +108,8 @@ mod pip_package_tests {
 
         for python_file in python_files.iter().take(max_files_to_test) {
             if let Ok(pyd_path) = compile_python_file(python_file, &output_dir) {
-                println!("✅ Compiled: {} -> {}", 
+                println!(
+                    "✅ Compiled: {} -> {}",
                     python_file.file_name().unwrap().to_string_lossy(),
                     pyd_path.file_name().unwrap().to_string_lossy()
                 );
@@ -104,8 +117,12 @@ mod pip_package_tests {
             }
         }
 
-        println!("Successfully compiled {}/{} files", compiled_count, max_files_to_test.min(python_files.len()));
-        
+        println!(
+            "Successfully compiled {}/{} files",
+            compiled_count,
+            max_files_to_test.min(python_files.len())
+        );
+
         Ok(())
     }
 }
@@ -123,7 +140,8 @@ fn download_pip_package(package_name: &str, version: &str, target_dir: &Path) ->
         .args(&[
             "download",
             "--no-deps", // Don't download dependencies
-            "--dest", download_dir.to_str().unwrap(),
+            "--dest",
+            download_dir.to_str().unwrap(),
             &package_spec,
         ])
         .output()?;
@@ -138,7 +156,10 @@ fn download_pip_package(package_name: &str, version: &str, target_dir: &Path) ->
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "whl" || ext == "gz") {
+        if path
+            .extension()
+            .map_or(false, |ext| ext == "whl" || ext == "gz")
+        {
             // Extract the package
             return extract_package(&path, &download_dir);
         }
@@ -165,9 +186,9 @@ fn extract_package(package_path: &Path, extract_dir: &Path) -> Result<PathBuf> {
 
 /// Extract a zip file (for .whl files)
 fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
-    use zip::ZipArchive;
     use std::fs::File;
     use std::io;
+    use zip::ZipArchive;
 
     let file = File::open(zip_path)?;
     let mut archive = ZipArchive::new(file)?;
@@ -193,8 +214,8 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
 /// Extract a tar.gz file
 fn extract_tar_gz(tar_path: &Path, dest_dir: &Path) -> Result<()> {
     use flate2::read::GzDecoder;
-    use tar::Archive;
     use std::fs::File;
+    use tar::Archive;
 
     let file = File::open(tar_path)?;
     let gz = GzDecoder::new(file);
@@ -219,13 +240,14 @@ fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> R
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_dir() {
             find_python_files_recursive(&path, python_files)?;
         } else if path.extension().map_or(false, |ext| ext == "py") {
             // Skip __pycache__ and test files for now
-            if !path.to_string_lossy().contains("__pycache__") 
-                && !path.to_string_lossy().contains("test") {
+            if !path.to_string_lossy().contains("__pycache__")
+                && !path.to_string_lossy().contains("test")
+            {
                 python_files.push(path);
             }
         }
@@ -245,9 +267,12 @@ fn compile_python_file(python_file: &Path, output_dir: &Path) -> Result<PathBuf>
             "run",
             "--",
             "compile",
-            "--input", python_file.to_str().unwrap(),
-            "--output", output_file.to_str().unwrap(),
-            "--use-uv", "true",
+            "--input",
+            python_file.to_str().unwrap(),
+            "--output",
+            output_file.to_str().unwrap(),
+            "--use-uv",
+            "true",
         ])
         .output()?;
 
@@ -255,15 +280,18 @@ fn compile_python_file(python_file: &Path, output_dir: &Path) -> Result<PathBuf>
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         return Err(anyhow::anyhow!(
-            "Failed to compile {}: stdout: {}, stderr: {}", 
-            python_file.display(), 
-            stdout, 
+            "Failed to compile {}: stdout: {}, stderr: {}",
+            python_file.display(),
+            stdout,
             stderr
         ));
     }
 
     if !output_file.exists() {
-        return Err(anyhow::anyhow!("Output file was not created: {}", output_file.display()));
+        return Err(anyhow::anyhow!(
+            "Output file was not created: {}",
+            output_file.display()
+        ));
     }
 
     Ok(output_file)
