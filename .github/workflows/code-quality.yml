@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   code-quality:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1.1.3
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1.1.6
     with:
       enable-coverage: false
       enable-python-wheel: false
