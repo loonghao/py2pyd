@@ -134,7 +134,7 @@ fn test_turbo_cdn_integration() -> Result<()> {
 /// Compile a Python file using py2pyd
 fn compile_python_file(input_file: &Path, output_file: &Path) -> Result<()> {
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "compile",
@@ -158,7 +158,7 @@ fn compile_python_file(input_file: &Path, output_file: &Path) -> Result<()> {
 /// Test URL optimization using turbo-cdn
 fn test_url_optimization(url: &str) -> Result<String> {
     let output = Command::new("cargo")
-        .args(&["run", "--example", "turbo_cdn_test"])
+        .args(["run", "--example", "turbo_cdn_test"])
         .output()?;
 
     if !output.status.success() {

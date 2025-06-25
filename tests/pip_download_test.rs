@@ -164,7 +164,7 @@ fn download_and_extract_package(
 
     // Use pip download to get the package
     let output = Command::new("pip")
-        .args(&[
+        .args([
             "download",
             "--no-deps", // Don't download dependencies
             "--dest",
@@ -188,7 +188,7 @@ fn download_and_extract_package(
         let entry = entry?;
         let path = entry.path();
         if path.is_file()
-            && (path.extension().map_or(false, |ext| ext == "whl")
+            && (path.extension().is_some_and(|ext| ext == "whl")
                 || path.to_string_lossy().ends_with(".tar.gz"))
         {
             downloaded_file = Some(path);
@@ -207,7 +207,7 @@ fn download_and_extract_package(
 
     if downloaded_file
         .extension()
-        .map_or(false, |ext| ext == "whl")
+        .is_some_and(|ext| ext == "whl")
     {
         extract_wheel(&downloaded_file, &extract_dir)?;
     } else if downloaded_file.to_string_lossy().ends_with(".tar.gz") {
@@ -288,7 +288,7 @@ fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> R
             if !dir_name.starts_with('.') && dir_name != "__pycache__" {
                 find_python_files_recursive(&path, python_files)?;
             }
-        } else if path.extension().map_or(false, |ext| ext == "py") {
+        } else if path.extension().is_some_and(|ext| ext == "py") {
             // Skip test files and __init__.py for now
             let file_name = path.file_name().unwrap().to_string_lossy();
             if !file_name.starts_with("test_")
@@ -306,7 +306,7 @@ fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> R
 /// Compile a Python file using py2pyd
 fn compile_with_py2pyd(input_file: &Path, output_file: &Path) -> Result<()> {
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "compile",
