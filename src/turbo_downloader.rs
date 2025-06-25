@@ -1,24 +1,26 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
-use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::io::{self, copy};
+use std::path::{Path, PathBuf};
 use tokio::runtime::Runtime;
 
 /// Turbo CDN downloader for high-performance downloads
 pub struct TurboDownloader {
     runtime: Runtime,
+    client: turbo_cdn::TurboCdn,
 }
 
 impl TurboDownloader {
     /// Create a new TurboDownloader instance
     pub fn new() -> Result<Self> {
-        let runtime = Runtime::new()
-            .with_context(|| "Failed to create Tokio runtime")?;
+        let runtime = Runtime::new().with_context(|| "Failed to create Tokio runtime")?;
 
-        Ok(Self {
-            runtime,
-        })
+        let client = runtime
+            .block_on(async { turbo_cdn::TurboCdn::new().await })
+            .with_context(|| "Failed to create TurboCdn client")?;
+
+        Ok(Self { runtime, client })
     }
 
     /// Download a file from URL to destination path
@@ -31,16 +33,18 @@ impl TurboDownloader {
                 .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
         }
 
-        // Use turbo-cdn async API for download
-        let result = self.runtime.block_on(async {
-            turbo_cdn::async_api::quick::download_url(url).await
-        }).with_context(|| format!("Failed to download from {}", url))?;
+        // Use turbo-cdn smart download with automatic CDN optimization
+        let result = self
+            .runtime
+            .block_on(async { self.client.download_smart_to_path(url, dest).await })
+            .with_context(|| format!("Failed to download from {}", url))?;
 
-        // Copy the downloaded file to the destination
-        fs::copy(&result.path, dest)
-            .with_context(|| format!("Failed to copy file to {}", dest.display()))?;
-
-        info!("Downloaded to {}", dest.display());
+        info!(
+            "Downloaded {} bytes to {} at {:.2} MB/s",
+            result.size,
+            dest.display(),
+            result.speed / 1024.0 / 1024.0
+        );
 
         Ok(())
     }
@@ -49,20 +53,30 @@ impl TurboDownloader {
     pub fn get_optimized_url(&self, url: &str) -> Result<String> {
         debug!("Getting optimized URL for: {}", url);
 
-        let optimized_url = self.runtime.block_on(async {
-            turbo_cdn::async_api::quick::optimize_url(url).await
-        }).with_context(|| format!("Failed to get optimized URL for {}", url))?;
+        let optimized_url = self
+            .runtime
+            .block_on(async { self.client.get_optimal_url(url).await })
+            .with_context(|| format!("Failed to get optimized URL for {}", url))?;
 
         debug!("Optimized URL: {}", optimized_url);
         Ok(optimized_url)
     }
 
     /// Download with progress callback (simplified version)
-    pub fn download_with_progress<F>(&self, url: &str, dest: &Path, progress_callback: F) -> Result<()>
+    pub fn download_with_progress<F>(
+        &self,
+        url: &str,
+        dest: &Path,
+        progress_callback: F,
+    ) -> Result<()>
     where
         F: Fn(f64) + Send + 'static,
     {
-        info!("Downloading {} to {} with progress tracking", url, dest.display());
+        info!(
+            "Downloading {} to {} with progress tracking",
+            url,
+            dest.display()
+        );
 
         // For now, just call the regular download and simulate progress
         progress_callback(0.0);
@@ -76,7 +90,7 @@ impl TurboDownloader {
 /// Fallback download function using reqwest (for compatibility)
 pub fn fallback_download_file(url: &str, dest: &Path) -> Result<()> {
     warn!("Using fallback download method for {}", url);
-    
+
     let client = reqwest::blocking::Client::new();
     let mut response = client
         .get(url)
@@ -104,17 +118,15 @@ pub fn fallback_download_file(url: &str, dest: &Path) -> Result<()> {
 pub fn smart_download_file(url: &str, dest: &Path) -> Result<()> {
     // Try turbo-cdn first
     match TurboDownloader::new() {
-        Ok(downloader) => {
-            match downloader.download_file(url, dest) {
-                Ok(()) => {
-                    debug!("Successfully downloaded using turbo-cdn");
-                    return Ok(());
-                }
-                Err(e) => {
-                    warn!("Turbo-cdn download failed: {}, falling back to reqwest", e);
-                }
+        Ok(downloader) => match downloader.download_file(url, dest) {
+            Ok(()) => {
+                debug!("Successfully downloaded using turbo-cdn");
+                return Ok(());
             }
-        }
+            Err(e) => {
+                warn!("Turbo-cdn download failed: {}, falling back to reqwest", e);
+            }
+        },
         Err(e) => {
             warn!("Failed to create turbo downloader: {}, using fallback", e);
         }
@@ -150,7 +162,8 @@ mod tests {
     #[test]
     fn test_get_optimized_url() {
         let downloader = TurboDownloader::new().unwrap();
-        let test_url = "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
+        let test_url =
+            "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
 
         // This test might fail without internet access
         match downloader.get_optimized_url(test_url) {

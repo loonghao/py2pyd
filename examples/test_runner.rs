@@ -76,19 +76,19 @@ AUTHOR = "py2pyd test"
 
     let python_file = test_dir.join("example_module.py");
     fs::write(&python_file, python_content)?;
-    
+
     println!("📄 Created test Python file: {}", python_file.display());
 
     // Compile the Python file
     let output_file = test_dir.join("example_module.pyd");
-    
+
     println!("🔨 Compiling Python module...");
     let result = compile_python_file(&python_file, &output_file);
-    
+
     match result {
         Ok(()) => {
             println!("✅ Successfully compiled to: {}", output_file.display());
-            
+
             if output_file.exists() {
                 let metadata = fs::metadata(&output_file)?;
                 println!("📊 Compiled file size: {} bytes", metadata.len());
@@ -110,10 +110,11 @@ fn test_turbo_cdn_integration() -> Result<()> {
     println!("--------------------------------");
 
     println!("🔍 Testing turbo-cdn URL optimization...");
-    
+
     // Test URL optimization
-    let test_url = "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
-    
+    let test_url =
+        "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
+
     match test_url_optimization(test_url) {
         Ok(optimized_url) => {
             println!("✅ URL optimization successful!");
@@ -137,9 +138,12 @@ fn compile_python_file(input_file: &Path, output_file: &Path) -> Result<()> {
             "run",
             "--",
             "compile",
-            "--input", input_file.to_str().unwrap(),
-            "--output", output_file.to_str().unwrap(),
-            "--use-uv", "true",
+            "--input",
+            input_file.to_str().unwrap(),
+            "--output",
+            output_file.to_str().unwrap(),
+            "--use-uv",
+            "true",
         ])
         .output()?;
 
@@ -154,11 +158,7 @@ fn compile_python_file(input_file: &Path, output_file: &Path) -> Result<()> {
 /// Test URL optimization using turbo-cdn
 fn test_url_optimization(url: &str) -> Result<String> {
     let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "--example",
-            "turbo_cdn_test",
-        ])
+        .args(&["run", "--example", "turbo_cdn_test"])
         .output()?;
 
     if !output.status.success() {
@@ -167,7 +167,7 @@ fn test_url_optimization(url: &str) -> Result<String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Parse the output to find the optimized URL
     for line in stdout.lines() {
         if line.starts_with("Optimized:") {
