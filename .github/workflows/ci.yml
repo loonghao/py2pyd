@@ -1,20 +1,31 @@
 name: CI
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '00 01 * * *' # Daily at 1 AM UTC (optional)
 
 jobs:
-  # Use our custom rust-actions-toolkit for comprehensive CI
   ci:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@master
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1
     with:
-      rust-toolchain: 'stable'
+      # Optional: Customize Rust toolchain
+      rust-toolchain: stable
+      # Optional: Enable/disable coverage reporting (default: true)
       enable-coverage: true
+      # Optional: Enable/disable Python wheel testing (default: true)
+      # Only runs if pyproject.toml exists
       enable-python-wheel: false
+      # Optional: Specify cross version for cross-compilation
+      cross-version: v0.2.5
+      # Optional: Add additional target platforms (JSON array)
+      additional-targets: '[]'
     secrets:
+      # Optional: For code coverage reporting
+      # Get this token from https://codecov.io/
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Custom integration tests for py2pyd specific functionality

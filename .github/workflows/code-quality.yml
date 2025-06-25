@@ -10,8 +10,8 @@ jobs:
   # Use our custom rust-actions-toolkit for code quality checks
   # This includes clippy, rustfmt, docs, and security audit
   code-quality:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@master
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1
     with:
-      rust-toolchain: 'stable'
+      rust-toolchain: stable
       enable-coverage: false
       enable-python-wheel: false
