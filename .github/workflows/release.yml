@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v1.1.6
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v1.2.0
     with:
       binary-name: "py2pyd"
       enable-python-wheels: false
