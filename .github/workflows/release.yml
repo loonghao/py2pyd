@@ -10,33 +10,31 @@ permissions:
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    container: ghcr.io/loonghao/rust-toolkit:cross-compile
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: windows-latest
-            target: aarch64-pc-windows-msvc
+        target:
+          # Zero-dependency Windows builds
+          - x86_64-pc-windows-gnu
+          - i686-pc-windows-gnu
+          # Static Linux builds
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+          # Standard builds
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v4
-      - uses: loonghao/rust-actions-toolkit@v1.2.0
+      - uses: loonghao/rust-actions-toolkit@v2.0.0
         with:
           command: release
           target: ${{ matrix.target }}
           binary-name: "py2pyd"
           enable-python-wheels: false
+          use-docker: true
+          docker-image: cross-compile
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
