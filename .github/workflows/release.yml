@@ -7,9 +7,8 @@ on:
 
 jobs:
   release:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v1
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@master
     with:
-      rust-toolchain: stable
       binary-name: "py2pyd"
       enable-python-wheels: false
     secrets:
