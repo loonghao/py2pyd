@@ -8,10 +8,8 @@ on:
 
 jobs:
   ci:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@master
     with:
-      rust-toolchain: stable
-      enable-coverage: true
       enable-python-wheel: false
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
