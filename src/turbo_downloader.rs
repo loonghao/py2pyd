@@ -91,27 +91,39 @@ impl TurboDownloader {
 pub fn fallback_download_file(url: &str, dest: &Path) -> Result<()> {
     warn!("Using fallback download method for {}", url);
 
-    let client = reqwest::blocking::Client::new();
-    let mut response = client
-        .get(url)
-        .send()
-        .with_context(|| format!("Failed to download from {}", url))?;
+    let runtime = Runtime::new().with_context(|| "Failed to create Tokio runtime")?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to download from {}: {}",
-            url,
-            response.status()
-        ));
-    }
+    runtime.block_on(async {
+        let client = reqwest::Client::new();
+        let response = client
+            .get(url)
+            .send()
+            .await
+            .with_context(|| format!("Failed to download from {}", url))?;
 
-    let mut file =
-        File::create(dest).with_context(|| format!("Failed to create file: {}", dest.display()))?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Failed to download from {}: {}",
+                url,
+                response.status()
+            ));
+        }
 
-    copy(&mut response, &mut file)
-        .with_context(|| format!("Failed to write to file: {}", dest.display()))?;
+        let mut file = File::create(dest)
+            .with_context(|| format!("Failed to create file: {}", dest.display()))?;
 
-    Ok(())
+        let mut content = std::io::Cursor::new(
+            response
+                .bytes()
+                .await
+                .with_context(|| "Failed to read response body")?
+        );
+
+        copy(&mut content, &mut file)
+            .with_context(|| format!("Failed to write to file: {}", dest.display()))?;
+
+        Ok(())
+    })
 }
 
 /// Smart download function that tries turbo-cdn first, then falls back to reqwest
