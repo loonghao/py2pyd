@@ -5,11 +5,15 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   release:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@master
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v1.1.3
     with:
       binary-name: "py2pyd"
       enable-python-wheels: false
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

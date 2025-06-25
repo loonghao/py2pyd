@@ -6,9 +6,14 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
 jobs:
   code-quality:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@master
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1.1.3
     with:
       enable-coverage: false
       enable-python-wheel: false
