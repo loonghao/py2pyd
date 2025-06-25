@@ -44,6 +44,7 @@ fn download_pip_package(package_name: &str, version: &str, target_dir: &Path) ->
 }
 
 /// Extract a package (wheel or tar.gz) to a directory
+#[allow(dead_code)]
 fn extract_package(package_path: &Path, extract_dir: &Path) -> Result<PathBuf> {
     fs::create_dir_all(extract_dir)?;
 
@@ -65,6 +66,7 @@ fn extract_package(package_path: &Path, extract_dir: &Path) -> Result<PathBuf> {
 }
 
 /// Extract a zip file (wheel) to a directory
+#[allow(dead_code)]
 fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
     let file = fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
@@ -93,6 +95,7 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
 }
 
 /// Extract a tar.gz file to a directory
+#[allow(dead_code)]
 fn extract_tar_gz(tar_path: &Path, dest_dir: &Path) -> Result<()> {
     let tar_gz = fs::File::open(tar_path)?;
     let tar = flate2::read::GzDecoder::new(tar_gz);
