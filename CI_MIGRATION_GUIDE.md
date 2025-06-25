@@ -90,15 +90,15 @@ jobs:
 
 ```yaml
 jobs:
-  release-plz:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release-plz.yml@master
+  release:
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release-plz.yml@v1
     with:
-      rust-toolchain: 'stable'
-      release-plz-version: 'v0.5'
+      rust-toolchain: stable
+      release-plz-version: v0.5
     secrets:
-      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
 ```
 
 **Benefits**:
