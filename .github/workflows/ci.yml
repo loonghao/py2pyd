@@ -13,10 +13,18 @@ permissions:
 
 jobs:
   ci:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v1.1.6
-    with:
-      enable-python-wheel: false
-    secrets:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: loonghao/rust-actions-toolkit@v1.2.0
+        with:
+          command: ci
+          rust-toolchain: stable
+          check-format: true
+          check-clippy: true
+          check-docs: true
+          clippy-args: '--all-targets --all-features -- -D warnings'
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 
