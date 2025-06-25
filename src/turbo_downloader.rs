@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
 use std::fs::{self, File};
-use std::io::{self, copy};
-use std::path::{Path, PathBuf};
+use std::io::copy;
+use std::path::Path;
 use tokio::runtime::Runtime;
 
 /// Turbo CDN downloader for high-performance downloads
