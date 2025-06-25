@@ -205,10 +205,7 @@ fn download_and_extract_package(
     let extract_dir = work_dir.join(format!("extracted_{}", package_name));
     fs::create_dir_all(&extract_dir)?;
 
-    if downloaded_file
-        .extension()
-        .is_some_and(|ext| ext == "whl")
-    {
+    if downloaded_file.extension().is_some_and(|ext| ext == "whl") {
         extract_wheel(&downloaded_file, &extract_dir)?;
     } else if downloaded_file.to_string_lossy().ends_with(".tar.gz") {
         extract_tar_gz(&downloaded_file, &extract_dir)?;
