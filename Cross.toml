@@ -1,0 +1,50 @@
+# Cross.toml - Configuration for cross-compilation with OpenSSL support
+# Place this file at the root of your project to resolve OpenSSL compilation issues
+
+[build.env]
+passthrough = [
+    "OPENSSL_STATIC",
+    "OPENSSL_LIB_DIR", 
+    "OPENSSL_INCLUDE_DIR",
+    "PKG_CONFIG_ALLOW_CROSS",
+    "PKG_CONFIG_PATH",
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER",
+    "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER"
+]
+
+# Configuration for musl targets
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:main"
+pre-build = [
+    "dpkg --add-architecture amd64",
+    "apt-get update && apt-get install -y libssl-dev:amd64 pkg-config"
+]
+
+[target.aarch64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:main"
+pre-build = [
+    "dpkg --add-architecture arm64",
+    "apt-get update && apt-get install -y libssl-dev:arm64 pkg-config"
+]
+
+# Configuration for GNU targets
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+pre-build = [
+    "dpkg --add-architecture arm64",
+    "apt-get update && apt-get install -y libssl-dev:arm64 pkg-config"
+]
+
+# Windows targets
+[target.x86_64-pc-windows-gnu]
+image = "ghcr.io/cross-rs/x86_64-pc-windows-gnu:main"
+
+[target.aarch64-pc-windows-msvc]
+image = "ghcr.io/cross-rs/aarch64-pc-windows-msvc:main"
+
+# macOS targets (when cross-compiling from Linux)
+[target.x86_64-apple-darwin]
+image = "ghcr.io/cross-rs/x86_64-apple-darwin:main"
+
+[target.aarch64-apple-darwin]
+image = "ghcr.io/cross-rs/aarch64-apple-darwin:main"
