@@ -4,6 +4,163 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
+/// Download a pip package to a specified directory
+fn download_pip_package(package_name: &str, version: &str, target_dir: &Path) -> Result<PathBuf> {
+    let package_spec = format!("{}=={}", package_name, version);
+    let download_dir = target_dir.join("downloads");
+    fs::create_dir_all(&download_dir)?;
+
+    println!("Downloading {} to {}", package_spec, download_dir.display());
+
+    // Use pip download to get the package
+    let output = Command::new("pip")
+        .args([
+            "download",
+            "--no-deps", // Don't download dependencies
+            "--dest",
+            download_dir.to_str().unwrap(),
+            &package_spec,
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to download package: {}", stderr));
+    }
+
+    // Find the downloaded file
+    for entry in fs::read_dir(&download_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path
+            .extension()
+            .is_some_and(|ext| ext == "whl" || ext == "gz")
+        {
+            return Ok(path);
+        }
+    }
+
+    Err(anyhow::anyhow!("No package file found after download"))
+}
+
+/// Extract a package (wheel or tar.gz) to a directory
+fn extract_package(package_path: &Path, extract_dir: &Path) -> Result<PathBuf> {
+    fs::create_dir_all(extract_dir)?;
+
+    if package_path.extension().is_some_and(|ext| ext == "whl") {
+        extract_zip(package_path, extract_dir)?;
+    } else {
+        extract_tar_gz(package_path, extract_dir)?;
+    }
+
+    // Return the first subdirectory (should be the package directory)
+    for entry in fs::read_dir(extract_dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            return Ok(entry.path());
+        }
+    }
+
+    Ok(extract_dir.to_path_buf())
+}
+
+/// Extract a zip file (wheel) to a directory
+fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
+    let file = fs::File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => dest_dir.join(path),
+            None => continue,
+        };
+
+        if file.name().ends_with('/') {
+            fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(p)?;
+                }
+            }
+            let mut outfile = fs::File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Extract a tar.gz file to a directory
+fn extract_tar_gz(tar_path: &Path, dest_dir: &Path) -> Result<()> {
+    let tar_gz = fs::File::open(tar_path)?;
+    let tar = flate2::read::GzDecoder::new(tar_gz);
+    let mut archive = tar::Archive::new(tar);
+    archive.unpack(dest_dir)?;
+    Ok(())
+}
+
+/// Find all Python files in a directory recursively
+fn find_python_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut python_files = Vec::new();
+    find_python_files_recursive(dir, &mut python_files)?;
+    Ok(python_files)
+}
+
+fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            // Skip __pycache__ and other cache directories
+            if let Some(dir_name) = path.file_name() {
+                if dir_name == "__pycache__" || dir_name == ".git" {
+                    continue;
+                }
+            }
+            find_python_files_recursive(&path, python_files)?;
+        } else if path.extension().is_some_and(|ext| ext == "py") {
+            python_files.push(path);
+        }
+    }
+    Ok(())
+}
+
+/// Compile a Python file using py2pyd
+fn compile_python_file(python_file: &Path, output_dir: &Path) -> Result<PathBuf> {
+    let output_file = output_dir.join(format!(
+        "{}.pyd",
+        python_file.file_stem().unwrap().to_str().unwrap()
+    ));
+
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "compile",
+            "--input",
+            python_file.to_str().unwrap(),
+            "--output",
+            output_file.to_str().unwrap(),
+            "--use-uv",
+            "true",
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "Failed to compile {}: {}",
+            python_file.display(),
+            stderr
+        ));
+    }
+
+    Ok(output_file)
+}
+
 /// Integration test for downloading and compiling a pure Python pip package
 #[cfg(test)]
 mod pip_package_tests {
@@ -125,174 +282,4 @@ mod pip_package_tests {
 
         Ok(())
     }
-}
-
-/// Download a pip package to a specified directory
-fn download_pip_package(package_name: &str, version: &str, target_dir: &Path) -> Result<PathBuf> {
-    let package_spec = format!("{}=={}", package_name, version);
-    let download_dir = target_dir.join("downloads");
-    fs::create_dir_all(&download_dir)?;
-
-    println!("Downloading {} to {}", package_spec, download_dir.display());
-
-    // Use pip download to get the package
-    let output = Command::new("pip")
-        .args(&[
-            "download",
-            "--no-deps", // Don't download dependencies
-            "--dest",
-            download_dir.to_str().unwrap(),
-            &package_spec,
-        ])
-        .output()?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to download package: {}", stderr));
-    }
-
-    // Find the downloaded file
-    let entries = fs::read_dir(&download_dir)?;
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        if path
-            .extension()
-            .map_or(false, |ext| ext == "whl" || ext == "gz")
-        {
-            // Extract the package
-            return extract_package(&path, &download_dir);
-        }
-    }
-
-    Err(anyhow::anyhow!("No package file found after download"))
-}
-
-/// Extract a downloaded package (wheel or tar.gz)
-fn extract_package(package_path: &Path, extract_dir: &Path) -> Result<PathBuf> {
-    let extract_target = extract_dir.join("extracted");
-    fs::create_dir_all(&extract_target)?;
-
-    if package_path.extension().map_or(false, |ext| ext == "whl") {
-        // Extract wheel file (it's just a zip)
-        extract_zip(package_path, &extract_target)?;
-    } else if package_path.to_string_lossy().ends_with(".tar.gz") {
-        // Extract tar.gz file
-        extract_tar_gz(package_path, &extract_target)?;
-    }
-
-    Ok(extract_target)
-}
-
-/// Extract a zip file (for .whl files)
-fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
-    use std::fs::File;
-    use std::io;
-    use zip::ZipArchive;
-
-    let file = File::open(zip_path)?;
-    let mut archive = ZipArchive::new(file)?;
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
-        let outpath = dest_dir.join(file.name());
-
-        if file.name().ends_with('/') {
-            fs::create_dir_all(&outpath)?;
-        } else {
-            if let Some(parent) = outpath.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            let mut outfile = File::create(&outpath)?;
-            io::copy(&mut file, &mut outfile)?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Extract a tar.gz file
-fn extract_tar_gz(tar_path: &Path, dest_dir: &Path) -> Result<()> {
-    use flate2::read::GzDecoder;
-    use std::fs::File;
-    use tar::Archive;
-
-    let file = File::open(tar_path)?;
-    let gz = GzDecoder::new(file);
-    let mut archive = Archive::new(gz);
-    archive.unpack(dest_dir)?;
-
-    Ok(())
-}
-
-/// Find all Python files in a directory recursively
-fn find_python_files(dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut python_files = Vec::new();
-    find_python_files_recursive(dir, &mut python_files)?;
-    Ok(python_files)
-}
-
-fn find_python_files_recursive(dir: &Path, python_files: &mut Vec<PathBuf>) -> Result<()> {
-    if !dir.is_dir() {
-        return Ok(());
-    }
-
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.is_dir() {
-            find_python_files_recursive(&path, python_files)?;
-        } else if path.extension().map_or(false, |ext| ext == "py") {
-            // Skip __pycache__ and test files for now
-            if !path.to_string_lossy().contains("__pycache__")
-                && !path.to_string_lossy().contains("test")
-            {
-                python_files.push(path);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Compile a Python file to pyd using our py2pyd tool
-fn compile_python_file(python_file: &Path, output_dir: &Path) -> Result<PathBuf> {
-    let file_stem = python_file.file_stem().unwrap().to_string_lossy();
-    let output_file = output_dir.join(format!("{}.pyd", file_stem));
-
-    // Use our py2pyd binary to compile
-    let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "compile",
-            "--input",
-            python_file.to_str().unwrap(),
-            "--output",
-            output_file.to_str().unwrap(),
-            "--use-uv",
-            "true",
-        ])
-        .output()?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        return Err(anyhow::anyhow!(
-            "Failed to compile {}: stdout: {}, stderr: {}",
-            python_file.display(),
-            stdout,
-            stderr
-        ));
-    }
-
-    if !output_file.exists() {
-        return Err(anyhow::anyhow!(
-            "Output file was not created: {}",
-            output_file.display()
-        ));
-    }
-
-    Ok(output_file)
 }

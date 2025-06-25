@@ -4,6 +4,43 @@ use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
+/// Compile a Python file using our py2pyd tool
+fn compile_python_file_with_py2pyd(input_file: &Path, output_file: &Path) -> Result<()> {
+    println!(
+        "Compiling {} -> {}",
+        input_file.display(),
+        output_file.display()
+    );
+
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "compile",
+            "--input",
+            input_file.to_str().unwrap(),
+            "--output",
+            output_file.to_str().unwrap(),
+            "--use-uv",
+            "true",
+            "--verbose",
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(anyhow::anyhow!(
+            "Failed to compile Python file: stdout: {}, stderr: {}",
+            stdout,
+            stderr
+        ));
+    }
+
+    println!("Compilation successful!");
+    Ok(())
+}
+
 /// Simple integration test for compiling Python packages
 #[cfg(test)]
 mod simple_package_tests {
@@ -280,53 +317,4 @@ def average(numbers):
 
         Ok(())
     }
-}
-
-/// Compile a Python file using our py2pyd tool
-fn compile_python_file_with_py2pyd(input_file: &Path, output_file: &Path) -> Result<()> {
-    println!(
-        "Compiling {} -> {}",
-        input_file.display(),
-        output_file.display()
-    );
-
-    let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "compile",
-            "--input",
-            input_file.to_str().unwrap(),
-            "--output",
-            output_file.to_str().unwrap(),
-            "--use-uv",
-            "true",
-            "--verbose",
-        ])
-        .output()?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        return Err(anyhow::anyhow!(
-            "py2pyd compilation failed:\nSTDOUT:\n{}\nSTDERR:\n{}",
-            stdout,
-            stderr
-        ));
-    }
-
-    if !output_file.exists() {
-        return Err(anyhow::anyhow!(
-            "Output file was not created: {}",
-            output_file.display()
-        ));
-    }
-
-    // Print compilation output for debugging
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if !stdout.trim().is_empty() {
-        println!("Compilation output:\n{}", stdout);
-    }
-
-    Ok(())
 }

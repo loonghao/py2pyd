@@ -116,7 +116,7 @@ pub fn fallback_download_file(url: &str, dest: &Path) -> Result<()> {
             response
                 .bytes()
                 .await
-                .with_context(|| "Failed to read response body")?
+                .with_context(|| "Failed to read response body")?,
         );
 
         copy(&mut content, &mut file)
