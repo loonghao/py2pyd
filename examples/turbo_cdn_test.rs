@@ -31,11 +31,10 @@ async fn main() -> Result<()> {
             println!("Downloaded to: {}", result.path.display());
             println!("Size: {} bytes", result.size);
             println!("Speed: {:.2} MB/s", result.speed / 1024.0 / 1024.0);
-            if let Some(chunks) = result.chunks_used {
-                println!("Chunks used: {}", chunks);
-            }
-            if let Some(final_url) = result.final_url {
-                println!("Final CDN URL: {}", final_url);
+            println!("Duration: {:.2}s", result.duration.as_secs_f64());
+            println!("Source URL: {}", result.url);
+            if result.resumed {
+                println!("Download was resumed");
             }
         }
         Err(e) => {

@@ -2,10 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use reqwest::blocking::Client;
+
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, copy};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
