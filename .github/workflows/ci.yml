@@ -6,25 +6,57 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: "0"
-
 jobs:
-  build-windows:
-    name: Build and Test (Windows)
-    runs-on: windows-latest
+  # Use our custom rust-actions-toolkit for comprehensive CI
+  ci:
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@master
+    with:
+      rust-toolchain: 'stable'
+      enable-coverage: true
+      enable-python-wheel: false
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Custom integration tests for py2pyd specific functionality
+  integration-tests:
+    name: Integration Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            binary: py2pyd.exe
+            extension: pyd
+          - os: ubuntu-latest
+            binary: py2pyd
+            extension: so
+          - os: macos-latest
+            binary: py2pyd
+            extension: so
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
 
-      - name: Setup MSVC
+      - name: Setup MSVC (Windows)
+        if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install build dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev python3-pip python3-setuptools python3-wheel gcc g++ pkg-config libssl-dev
+
+      - name: Install macOS build dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Installing macOS build dependencies..."
+          brew install gcc
+          xcode-select -p || sudo xcode-select --reset
+          brew install python-tk
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
@@ -34,14 +66,8 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-
       - name: Build
         run: cargo build --release
-
-      - name: Run tests
-        run: cargo test --release
 
       - name: Install Python
         uses: actions/setup-python@v5
@@ -53,7 +79,8 @@ jobs:
           pip install uv
           uv --version
 
-      - name: Test with Python environment
+      - name: Test py2pyd functionality (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
           # Create a simple Python file for testing
           echo "def hello(): return 'Hello, World!'" > test_module.py
@@ -80,76 +107,29 @@ jobs:
             exit 1
           }
 
-      - name: Upload executable
-        uses: actions/upload-artifact@v4
-        with:
-          name: py2pyd-windows
-          path: target/release/py2pyd.exe
-          if-no-files-found: error
-
-  build-linux:
-    name: Build and Test (Linux)
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3-dev python3-pip python3-setuptools python3-wheel gcc g++ pkg-config libssl-dev
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Run tests
-        run: cargo test --release
-
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        run: |
-          pip install uv
-          uv --version
-
-      - name: Test with Python environment
+      - name: Test py2pyd functionality (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           # Create a simple Python file for testing
           echo "def hello(): return 'Hello, World!'" > test_module.py
 
           # Test with explicit output path
-          ./target/release/py2pyd compile -i test_module.py -o explicit_output.so -O 2
+          ./target/release/${{ matrix.binary }} compile -i test_module.py -o explicit_output.${{ matrix.extension }} -O 2
 
           # Verify the explicit output file exists
-          if [ -f explicit_output.so ]; then
-            echo "Successfully compiled test_module.py to explicit_output.so"
+          if [ -f explicit_output.${{ matrix.extension }} ]; then
+            echo "Successfully compiled test_module.py to explicit_output.${{ matrix.extension }}"
           else
             echo "Failed to compile test_module.py with explicit output path"
             exit 1
           fi
 
           # Test with default output path (should be in current directory)
-          ./target/release/py2pyd compile -i test_module.py -O 2
+          ./target/release/${{ matrix.binary }} compile -i test_module.py -O 2
 
           # Verify the default output file exists in current directory
-          if [ -f test_module.so ]; then
-            echo "Successfully compiled test_module.py to test_module.so in current directory"
+          if [ -f test_module.${{ matrix.extension }} ]; then
+            echo "Successfully compiled test_module.py to test_module.${{ matrix.extension }} in current directory"
           else
             echo "Failed to compile test_module.py with default output path"
             exit 1
@@ -158,86 +138,8 @@ jobs:
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: py2pyd-linux
-          path: target/release/py2pyd
+          name: py2pyd-${{ matrix.os }}
+          path: target/release/${{ matrix.binary }}
           if-no-files-found: error
 
-  build-macos:
-    name: Build and Test (macOS)
-    runs-on: macos-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Install macOS build dependencies
-        run: |
-          echo "Installing macOS build dependencies..."
-          # Install C compiler and development tools
-          brew install gcc
-          # Ensure Xcode Command Line Tools are set up
-          xcode-select -p || sudo xcode-select --reset
-          # Install Python development headers
-          brew install python-tk
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Run tests
-        run: cargo test --release
-
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        run: |
-          pip install uv
-          uv --version
-
-      - name: Test with Python environment
-        run: |
-          # Create a simple Python file for testing
-          echo "def hello(): return 'Hello, World!'" > test_module.py
-
-          # Test with explicit output path
-          ./target/release/py2pyd compile -i test_module.py -o explicit_output.so -O 2
-
-          # Verify the explicit output file exists
-          if [ -f explicit_output.so ]; then
-            echo "Successfully compiled test_module.py to explicit_output.so"
-          else
-            echo "Failed to compile test_module.py with explicit output path"
-            exit 1
-          fi
-
-          # Test with default output path (should be in current directory)
-          ./target/release/py2pyd compile -i test_module.py -O 2
-
-          # Verify the default output file exists in current directory
-          if [ -f test_module.so ]; then
-            echo "Successfully compiled test_module.py to test_module.so in current directory"
-          else
-            echo "Failed to compile test_module.py with default output path"
-            exit 1
-          fi
-
-      - name: Upload executable
-        uses: actions/upload-artifact@v4
-        with:
-          name: py2pyd-macos
-          path: target/release/py2pyd
-          if-no-files-found: error

@@ -6,45 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
+  # Use our custom rust-actions-toolkit for code quality checks
+  # This includes clippy, rustfmt, docs, and security audit
   code-quality:
-    name: Code Quality Checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-
-      - name: Install cargo-audit
-        run: cargo install --locked cargo-audit
-
-      - name: Check for security vulnerabilities
-        run: cargo audit
-
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Check documentation
-        run: cargo doc --no-deps --document-private-items
-
-      - name: Upload documentation
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-docs
-          path: target/doc
-          if-no-files-found: warn
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@master
+    with:
+      rust-toolchain: 'stable'
+      enable-coverage: false
+      enable-python-wheel: false
