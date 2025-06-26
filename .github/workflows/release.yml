@@ -34,8 +34,6 @@ jobs:
           command: release
           target: ${{ matrix.target }}
           binary-name: py2pyd
-          rust-toolchain: "1.83.0"
-          use-docker: true
-          docker-image: cross-compile
+          rust-toolchain: stable
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

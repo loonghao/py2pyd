@@ -25,9 +25,7 @@ jobs:
         uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
           command: ci
-          rust-toolchain: "1.83.0"
-          use-docker: true
-          docker-image: security-audit
+          rust-toolchain: stable
           clippy-args: '--all-targets --all-features -- -D warnings -D clippy::pedantic -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string -A clippy::needless_raw_string_hashes -A clippy::cast_precision_loss -A clippy::cast_lossless'
 
       - name: Run security audit
