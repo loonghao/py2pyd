@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - uses: loonghao/rust-actions-toolkit@v2.0.1
+      - uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
           command: release-plz
           rust-toolchain: stable
