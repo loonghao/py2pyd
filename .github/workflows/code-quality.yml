@@ -21,11 +21,29 @@ jobs:
     container: ghcr.io/loonghao/rust-toolkit:security-audit
     steps:
       - uses: actions/checkout@v4
-      - uses: loonghao/rust-actions-toolkit@v2.0.2
-        with:
-          command: ci
-          rust-toolchain: stable
-          check-format: true
-          check-clippy: true
-          check-docs: true
-          clippy-args: '--all-targets --all-features -- -D warnings -D clippy::pedantic'
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          echo "🎨 Checking code formatting..."
+          cargo fmt --all --check
+
+      - name: Run clippy with pedantic rules
+        shell: bash
+        run: |
+          echo "📎 Running clippy lints with pedantic rules..."
+          cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic
+
+      - name: Check documentation
+        shell: bash
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          echo "📚 Checking documentation..."
+          cargo doc --no-deps --document-private-items --workspace
+
+      - name: Run security audit
+        shell: bash
+        run: |
+          echo "🔒 Running security audit..."
+          cargo audit

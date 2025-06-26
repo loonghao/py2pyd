@@ -33,14 +33,31 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - uses: loonghao/rust-actions-toolkit@v2.0.2
-        with:
-          command: ci
-          rust-toolchain: stable
-          check-format: true
-          check-clippy: true
-          check-docs: true
-          clippy-args: '--all-targets --all-features -- -D warnings'
+      - name: Check formatting
+        shell: bash
+        run: |
+          echo "🎨 Checking code formatting..."
+          cargo fmt --all --check
+
+      - name: Run clippy
+        shell: bash
+        run: |
+          echo "📎 Running clippy lints..."
+          cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check documentation
+        shell: bash
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          echo "📚 Checking documentation..."
+          cargo doc --no-deps --document-private-items --workspace
+
+      - name: Run tests
+        shell: bash
+        run: |
+          echo "🧪 Running tests..."
+          cargo test --verbose --workspace
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
