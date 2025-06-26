@@ -246,12 +246,11 @@ pub fn check_build_tools() -> Result<BuildTools> {
                 "No suitable build tools found. You need Xcode Command Line Tools to compile Python extensions.\n\n{}",
                 instructions
             ));
-        } else {
-            return Err(anyhow!(
-                "No suitable build tools found. You need GCC and development tools to compile Python extensions.\n\n{}",
-                instructions
-            ));
         }
+        return Err(anyhow!(
+            "No suitable build tools found. You need GCC and development tools to compile Python extensions.\n\n{}",
+            instructions
+        ));
     }
 
     Ok(tools)
