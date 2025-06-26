@@ -12,7 +12,7 @@ pub struct TurboDownloader {
 }
 
 impl TurboDownloader {
-    /// Create a new TurboDownloader instance
+    /// Create a new `TurboDownloader` instance
     pub fn new() -> Result<Self> {
         let runtime = Runtime::new().with_context(|| "Failed to create Tokio runtime")?;
 
@@ -37,7 +37,7 @@ impl TurboDownloader {
         let result = self
             .runtime
             .block_on(async { self.client.download_smart_to_path(url, dest).await })
-            .with_context(|| format!("Failed to download from {}", url))?;
+            .with_context(|| format!("Failed to download from {url}"))?;
 
         info!(
             "Downloaded {} bytes to {} at {:.2} MB/s",
@@ -51,14 +51,14 @@ impl TurboDownloader {
 
     /// Get optimized URL for a given URL
     pub fn get_optimized_url(&self, url: &str) -> Result<String> {
-        debug!("Getting optimized URL for: {}", url);
+        debug!("Getting optimized URL for: {url}");
 
         let optimized_url = self
             .runtime
             .block_on(async { self.client.get_optimal_url(url).await })
-            .with_context(|| format!("Failed to get optimized URL for {}", url))?;
+            .with_context(|| format!("Failed to get optimized URL for {url}"))?;
 
-        debug!("Optimized URL: {}", optimized_url);
+        debug!("Optimized URL: {optimized_url}");
         Ok(optimized_url)
     }
 
@@ -89,7 +89,7 @@ impl TurboDownloader {
 
 /// Fallback download function using reqwest (for compatibility)
 pub fn fallback_download_file(url: &str, dest: &Path) -> Result<()> {
-    warn!("Using fallback download method for {}", url);
+    warn!("Using fallback download method for {url}");
 
     let runtime = Runtime::new().with_context(|| "Failed to create Tokio runtime")?;
 
