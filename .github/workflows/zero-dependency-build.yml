@@ -25,6 +25,7 @@ jobs:
   zero-dependency-builds:
     name: Zero-Dependency Build (${{ matrix.target }})
     runs-on: ubuntu-latest
+    container: ghcr.io/loonghao/rust-toolkit:cross-compile
     strategy:
       matrix:
         include:
@@ -45,14 +46,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check Rust version
+        shell: bash
+        run: |
+          echo "🦀 Checking Rust version..."
+          rustc --version
+          echo "📦 Cargo version:"
+          cargo --version
+
       - name: Build zero-dependency binary
-        uses: loonghao/rust-actions-toolkit@v2.0.2
-        with:
-          command: release
-          target: ${{ matrix.target }}
-          binary-name: py2pyd
-          rust-toolchain: stable
-          github-token: ""  # No upload needed for this workflow
+        shell: bash
+        run: |
+          echo "🚀 Building zero-dependency binary for ${{ matrix.target }}"
+          echo "📦 Target: ${{ matrix.name }}"
+
+          # Set environment for zero-dependency builds
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          export OPENSSL_STATIC=1
+          export PKG_CONFIG_ALLOW_CROSS=1
+
+          # Build the binary
+          cargo build --release --target ${{ matrix.target }}
+
+          echo "✅ Build completed successfully!"
       
       - name: Verify zero dependencies
         if: matrix.verify
