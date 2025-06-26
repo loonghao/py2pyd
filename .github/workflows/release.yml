@@ -34,7 +34,5 @@ jobs:
           target: ${{ matrix.target }}
           binary-name: "py2pyd"
           enable-python-wheels: false
-          use-docker: true
-          docker-image: cross-compile
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
