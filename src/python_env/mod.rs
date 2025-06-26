@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use regex::Regex;
 
 use std::env;
@@ -25,8 +25,8 @@ const UV_WINDOWS_URL: &str =
     "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
 
 // Global state for Python environment
-static PYTHON_ENV: Lazy<Mutex<PythonEnvironment>> =
-    Lazy::new(|| Mutex::new(PythonEnvironment::new()));
+static PYTHON_ENV: LazyLock<Mutex<PythonEnvironment>> =
+    LazyLock::new(|| Mutex::new(PythonEnvironment::new()));
 
 /// Represents a Python environment configuration
 pub struct PythonEnvironment {
@@ -166,7 +166,7 @@ fn is_python3(path: &Path) -> Result<bool> {
 
 /// Check if the version string indicates Python 3.x
 fn is_python3_version(version_str: &str) -> Result<bool> {
-    static VERSION_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"Python (\d+)\.").unwrap());
+    static VERSION_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Python (\d+)\.").unwrap());
 
     if let Some(captures) = VERSION_REGEX.captures(version_str) {
         if let Some(major_version) = captures.get(1) {

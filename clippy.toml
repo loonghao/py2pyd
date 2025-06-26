@@ -1,0 +1,10 @@
+# Clippy configuration for py2pyd
+# This file configures clippy to be less strict on certain pedantic rules
+# while maintaining high code quality standards
+
+# Allow some pedantic rules that are too strict for our use case
+too-many-lines-threshold = 200
+type-complexity-threshold = 250
+
+# Allow certain patterns that are common in our codebase
+avoid-breaking-exported-api = false

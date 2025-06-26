@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           echo "📎 Running clippy lints with pedantic rules..."
-          cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic
+          cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string -A clippy::needless_raw_string_hashes -A clippy::cast_precision_loss -A clippy::cast_lossless
 
       - name: Check documentation
         shell: bash

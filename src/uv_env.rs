@@ -227,40 +227,39 @@ impl UvEnv {
 /// Find the uv executable
 fn find_uv_executable() -> Result<PathBuf> {
     // Try to find uv in PATH
-    match which::which("uv") {
-        Ok(path) => return Ok(path),
-        Err(_) => {
-            // Try common installation locations
-            let common_paths = if cfg!(windows) {
-                vec![
-                    r"C:\Users\hallo\.cargo\bin\uv.exe",
-                    r"C:\Program Files\uv\uv.exe",
-                    r"C:\uv\uv.exe",
-                ]
-            } else {
-                vec![
-                    "/usr/bin/uv",
-                    "/usr/local/bin/uv",
-                    "/opt/uv/bin/uv",
-                    "/home/hallo/.cargo/bin/uv",
-                ]
-            };
+    if let Ok(path) = which::which("uv") {
+        return Ok(path);
+    }
 
-            for path_str in common_paths {
-                let path = PathBuf::from(path_str);
-                if path.exists() {
-                    return Ok(path);
-                }
-            }
+    // Try common installation locations
+    let common_paths = if cfg!(windows) {
+        vec![
+            r"C:\Users\hallo\.cargo\bin\uv.exe",
+            r"C:\Program Files\uv\uv.exe",
+            r"C:\uv\uv.exe",
+        ]
+    } else {
+        vec![
+            "/usr/bin/uv",
+            "/usr/local/bin/uv",
+            "/opt/uv/bin/uv",
+            "/home/hallo/.cargo/bin/uv",
+        ]
+    };
 
-            // If uv is not found, try to install it
-            warn!("uv not found, attempting to install it");
-            install_uv()?;
-
-            // Try to find uv again
-            which::which("uv").with_context(|| "Failed to find uv executable after installation")
+    for path_str in common_paths {
+        let path = PathBuf::from(path_str);
+        if path.exists() {
+            return Ok(path);
         }
     }
+
+    // If uv is not found, try to install it
+    warn!("uv not found, attempting to install it");
+    install_uv()?;
+
+    // Try to find uv again
+    which::which("uv").with_context(|| "Failed to find uv executable after installation")
 }
 
 /// Install uv (latest version - 0.7.6 as of last update)

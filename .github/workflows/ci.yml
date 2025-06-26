@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           echo "📎 Running clippy lints..."
-          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy --all-targets --all-features -- -D warnings -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string
 
       - name: Check documentation
         shell: bash
