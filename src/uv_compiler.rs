@@ -76,7 +76,7 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
 
     // Create the setup.py file
     let setup_py_path = temp_dir_path.join("setup.py");
-    let setup_py_content = generate_setup_py(module_name, &source_code, config)?;
+    let setup_py_content = generate_setup_py(module_name, &source_code, config);
     fs::write(&setup_py_path, setup_py_content)
         .with_context(|| format!("Failed to write setup.py to {}", setup_py_path.display()))?;
 
@@ -225,7 +225,7 @@ pub fn batch_compile(
 
         // Compile the file
         match compile_file(&input_path, &output_path, config) {
-            Ok(_) => {
+            Ok(()) => {
                 success_count += 1;
             }
             Err(e) => {
@@ -260,7 +260,7 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
         if recursive {
             for entry in walkdir::WalkDir::new(pattern_path)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
             {
                 let path = entry.path();
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {
@@ -301,7 +301,7 @@ fn generate_setup_py(
     module_name: &str,
     _source_code: &str,      // Unused but kept for potential future use
     _config: &CompileConfig, // Unused but kept for potential future use
-) -> Result<String> {
+) -> String {
     let mut setup_py = String::new();
 
     setup_py.push_str("from setuptools import setup, Extension\n");
@@ -335,5 +335,5 @@ fn generate_setup_py(
 
     setup_py.push_str(")\n");
 
-    Ok(setup_py)
+    setup_py
 }

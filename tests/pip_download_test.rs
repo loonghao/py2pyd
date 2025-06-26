@@ -9,7 +9,7 @@ use tempfile::TempDir;
 mod pip_download_tests {
     use super::*;
 
-    /// Test downloading a simple pure Python package from PyPI
+    /// Test downloading a simple pure Python package from `PyPI`
     #[test]
     #[ignore] // Use `cargo test -- --ignored` to run this test
     fn test_download_six_package() -> Result<()> {

@@ -108,7 +108,7 @@ pub fn batch_compile(
 
         // Compile the file
         match compile_file(&input_path, &output_path, _target, optimize_level) {
-            Ok(_) => {
+            Ok(()) => {
                 success_count += 1;
             }
             Err(e) => {
@@ -143,7 +143,7 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
         if recursive {
             for entry in WalkDir::new(pattern_path)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
             {
                 let path = entry.path();
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use turbo_cdn::*;
+use turbo_cdn::TurboCdn;
 
 #[tokio::main]
 async fn main() -> Result<()> {
