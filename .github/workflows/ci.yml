@@ -18,6 +18,7 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    container: ghcr.io/loonghao/rust-toolkit:base
     steps:
       - uses: actions/checkout@v4
 
@@ -29,11 +30,30 @@ jobs:
           cargo --version
         shell: bash
 
-      - name: Run CI checks
-        uses: loonghao/rust-actions-toolkit@v2.0.2
-        with:
-          command: ci
-          rust-toolchain: stable
-          clippy-args: '--all-targets --all-features -- -D warnings -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string'
+      - name: Check formatting
+        shell: bash
+        run: |
+          echo "🎨 Checking code formatting..."
+          cargo fmt --all --check
+
+      - name: Run clippy
+        shell: bash
+        run: |
+          echo "📎 Running clippy lints..."
+          cargo clippy --all-targets --all-features -- -D warnings -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string
+
+      - name: Check documentation
+        shell: bash
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          echo "📚 Checking documentation..."
+          cargo doc --no-deps --document-private-items --workspace
+
+      - name: Run tests
+        shell: bash
+        run: |
+          echo "🧪 Running tests..."
+          cargo test --verbose --workspace
 
 
