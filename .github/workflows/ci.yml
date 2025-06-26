@@ -17,7 +17,7 @@ jobs:
     container: ghcr.io/loonghao/rust-toolkit:base
     steps:
       - uses: actions/checkout@v4
-      - uses: loonghao/rust-actions-toolkit@v2.0.1
+      - uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
           command: ci
           rust-toolchain: stable
