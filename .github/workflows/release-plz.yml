@@ -12,7 +12,6 @@ permissions:
 jobs:
   release-plz:
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:base
     if: github.event.repository.fork == false
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +22,7 @@ jobs:
       - uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
           command: release-plz
-          rust-toolchain: stable
+          rust-toolchain: "1.83.0"
           release-plz-command: both
           cargo-registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

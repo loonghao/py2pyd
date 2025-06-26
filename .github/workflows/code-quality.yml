@@ -18,32 +18,24 @@ concurrency:
 jobs:
   code-quality:
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:security-audit
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check formatting
-        shell: bash
-        run: |
-          echo "🎨 Checking code formatting..."
-          cargo fmt --all --check
-
-      - name: Run clippy with pedantic rules
-        shell: bash
-        run: |
-          echo "📎 Running clippy lints with pedantic rules..."
-          cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string -A clippy::needless_raw_string_hashes -A clippy::cast_precision_loss -A clippy::cast_lossless
-
-      - name: Check documentation
-        shell: bash
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: |
-          echo "📚 Checking documentation..."
-          cargo doc --no-deps --document-private-items --workspace
+      - name: Run code quality checks
+        uses: loonghao/rust-actions-toolkit@v2.0.2
+        with:
+          command: ci
+          rust-toolchain: "1.83.0"
+          use-docker: true
+          docker-image: security-audit
+          clippy-args: '--all-targets --all-features -- -D warnings -D clippy::pedantic -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string -A clippy::needless_raw_string_hashes -A clippy::cast_precision_loss -A clippy::cast_lossless'
 
       - name: Run security audit
         shell: bash
         run: |
           echo "🔒 Running security audit..."
+          # Install cargo-audit if not available
+          if ! command -v cargo-audit &> /dev/null; then
+            cargo install cargo-audit
+          fi
           cargo audit
