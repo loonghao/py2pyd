@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
-use std::sync::LazyLock;
 use regex::Regex;
+use std::sync::LazyLock;
 
 use std::env;
 use std::fs::{self, File};
@@ -166,7 +166,8 @@ fn is_python3(path: &Path) -> Result<bool> {
 
 /// Check if the version string indicates Python 3.x
 fn is_python3_version(version_str: &str) -> Result<bool> {
-    static VERSION_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Python (\d+)\.").unwrap());
+    static VERSION_REGEX: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"Python (\d+)\.").unwrap());
 
     if let Some(captures) = VERSION_REGEX.captures(version_str) {
         if let Some(major_version) = captures.get(1) {
