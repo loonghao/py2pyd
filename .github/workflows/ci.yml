@@ -18,47 +18,16 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:base
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
+      - name: Run CI checks
+        uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Check formatting
-        shell: bash
-        run: |
-          echo "🎨 Checking code formatting..."
-          cargo fmt --all --check
-
-      - name: Run clippy
-        shell: bash
-        run: |
-          echo "📎 Running clippy lints..."
-          cargo clippy --all-targets --all-features -- -D warnings -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string
-
-      - name: Check documentation
-        shell: bash
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: |
-          echo "📚 Checking documentation..."
-          cargo doc --no-deps --document-private-items --workspace
-
-      - name: Run tests
-        shell: bash
-        run: |
-          echo "🧪 Running tests..."
-          cargo test --verbose --workspace
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          command: ci
+          rust-toolchain: "1.83.0"
+          use-docker: true
+          docker-image: base
+          clippy-args: '--all-targets --all-features -- -D warnings -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string'
 
 

@@ -11,7 +11,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:cross-compile
     strategy:
       matrix:
         target:
@@ -29,26 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build release binary
-        shell: bash
-        run: |
-          echo "🚀 Building release binary for ${{ matrix.target }}"
-
-          # Set environment for zero-dependency builds
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          export OPENSSL_STATIC=1
-          export PKG_CONFIG_ALLOW_CROSS=1
-
-          # Build the binary
-          cargo build --release --target ${{ matrix.target }}
-
-          echo "✅ Build completed successfully!"
-
-      - name: Upload release artifacts
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Build and release binary
+        uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
-          files: |
-            target/${{ matrix.target }}/release/py2pyd*
-          token: ${{ secrets.GITHUB_TOKEN }}
+          command: release
+          target: ${{ matrix.target }}
+          binary-name: py2pyd
+          rust-toolchain: "1.83.0"
+          use-docker: true
+          docker-image: cross-compile
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 

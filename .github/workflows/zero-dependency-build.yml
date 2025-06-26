@@ -25,7 +25,6 @@ jobs:
   zero-dependency-builds:
     name: Zero-Dependency Build (${{ matrix.target }})
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:cross-compile
     strategy:
       matrix:
         include:
@@ -41,39 +40,28 @@ jobs:
           - target: aarch64-unknown-linux-musl
             name: Linux ARM64 Static
             verify: true
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Build zero-dependency binary
-        shell: bash
-        run: |
-          echo "🚀 Building zero-dependency binary for ${{ matrix.target }}"
-          echo "📦 Target: ${{ matrix.name }}"
-
-          # Set environment for zero-dependency builds
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          export OPENSSL_STATIC=1
-          export PKG_CONFIG_ALLOW_CROSS=1
-
-          # Build the binary
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            echo "🪟 Building Windows executable..."
-            cargo build --release --target ${{ matrix.target }}
-          else
-            echo "🐧 Building Linux static binary..."
-            cargo build --release --target ${{ matrix.target }}
-          fi
-
-          echo "✅ Build completed successfully!"
+        uses: loonghao/rust-actions-toolkit@v2.0.2
+        with:
+          command: release
+          target: ${{ matrix.target }}
+          binary-name: py2pyd
+          rust-toolchain: "1.83.0"
+          use-docker: true
+          docker-image: cross-compile
+          github-token: ""  # No upload needed for this workflow
       
       - name: Verify zero dependencies
         if: matrix.verify
         shell: bash
         run: |
           echo "🔍 Verifying zero dependencies for ${{ matrix.target }}"
-          
+
           binary_path="target/${{ matrix.target }}/release/py2pyd"
           if [[ "${{ matrix.target }}" == *windows* ]]; then
             binary_path="${binary_path}.exe"
