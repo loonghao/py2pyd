@@ -25,5 +25,3 @@ jobs:
           check-clippy: true
           check-docs: true
           clippy-args: '--all-targets --all-features -- -D warnings -D clippy::pedantic'
-          use-docker: true
-          docker-image: security-audit
