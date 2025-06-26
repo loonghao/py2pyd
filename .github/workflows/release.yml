@@ -28,7 +28,7 @@ jobs:
           - aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v4
-      - uses: loonghao/rust-actions-toolkit@v2.0.0
+      - uses: loonghao/rust-actions-toolkit@v2.0.1
         with:
           command: release
           target: ${{ matrix.target }}
