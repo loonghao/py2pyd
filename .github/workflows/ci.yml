@@ -21,6 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Rust version
+        run: |
+          echo "🦀 Checking Rust version for malachite compatibility..."
+          rustc --version
+          echo "📦 Cargo version:"
+          cargo --version
+        shell: bash
+
       - name: Run CI checks
         uses: loonghao/rust-actions-toolkit@v2.0.2
         with:
