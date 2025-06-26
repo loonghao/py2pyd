@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   zero-dependency-builds:
     name: Zero-Dependency Build (${{ matrix.target }})
@@ -43,12 +47,26 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Build zero-dependency binary
-        uses: loonghao/rust-actions-toolkit@v2
-        with:
-          command: release
-          target: ${{ matrix.target }}
-          binary-name: "py2pyd"
-          enable-python-wheels: false
+        shell: bash
+        run: |
+          echo "🚀 Building zero-dependency binary for ${{ matrix.target }}"
+          echo "📦 Target: ${{ matrix.name }}"
+
+          # Set environment for zero-dependency builds
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          export OPENSSL_STATIC=1
+          export PKG_CONFIG_ALLOW_CROSS=1
+
+          # Build the binary
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            echo "🪟 Building Windows executable..."
+            cargo build --release --target ${{ matrix.target }}
+          else
+            echo "🐧 Building Linux static binary..."
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+          echo "✅ Build completed successfully!"
       
       - name: Verify zero dependencies
         if: matrix.verify
