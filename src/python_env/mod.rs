@@ -68,9 +68,8 @@ pub fn initialize_python_env(
             env.python_path = Some(path);
             env.initialized = true;
             return Ok(());
-        } else {
-            warn!("Provided Python interpreter not found: {}", path.display());
         }
+        warn!("Provided Python interpreter not found: {}", path.display());
     }
 
     // 2. Try to find Python in PATH (if no specific version is requested)
@@ -137,7 +136,7 @@ fn find_python_in_path() -> Result<PathBuf> {
                     return Ok(path);
                 }
             }
-            Err(_) => continue,
+            Err(_) => {}
         }
     }
 

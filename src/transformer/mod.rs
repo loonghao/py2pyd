@@ -12,8 +12,8 @@ pub struct TransformedModule {
     pub build_dir: PathBuf,
 }
 
-/// Transform a Python AST into Rust code using PyO3
-pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) -> Result<String> {
+/// Transform a Python AST into Rust code using `PyO3`
+pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) -> String {
     info!("Transforming Python AST to Rust code");
     debug!(
         "Module name: {}, Optimization level: {}",
@@ -86,7 +86,7 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
     }
 
     debug!("Generated {} lines of Rust code", rust_code.lines().count());
-    Ok(rust_code)
+    rust_code
 }
 
 /// Generate a Cargo.toml file for the transformed module
@@ -150,8 +150,7 @@ pub fn transform_file(input_path: &Path, optimize_level: u8) -> Result<Transform
         .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?;
 
     // Transform the AST to Rust code
-    let rust_code = transform_ast(&ast, module_name, optimize_level)
-        .with_context(|| "Failed to transform AST to Rust code")?;
+    let rust_code = transform_ast(&ast, module_name, optimize_level);
 
     // Generate Cargo.toml
     let cargo_toml = generate_cargo_toml(module_name, optimize_level);

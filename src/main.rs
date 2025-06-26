@@ -185,20 +185,20 @@ fn main() -> Result<()> {
                     .with_context(|| format!("Failed to compile {}", input.display()))?;
 
                 // Clean up virtual environment if not keeping it
-                if !cli.keep_temp {
-                    info!("Cleaning up temporary virtual environment...");
-                    if let Err(e) = python_env::cleanup_venv() {
-                        warn!("Failed to clean up virtual environment: {}", e);
-                    } else {
-                        info!("Virtual environment cleaned up successfully");
-                    }
-                } else {
+                if cli.keep_temp {
                     let venv_path = python_env::get_venv_path()?;
                     info!("Keeping virtual environment at: {}", venv_path.display());
                     info!(
                         "You can activate it with: {}\\Scripts\\activate",
                         venv_path.display()
                     );
+                } else {
+                    info!("Cleaning up temporary virtual environment...");
+                    if let Err(e) = python_env::cleanup_venv() {
+                        warn!("Failed to clean up virtual environment: {}", e);
+                    } else {
+                        info!("Virtual environment cleaned up successfully");
+                    }
                 }
             }
 
@@ -260,20 +260,20 @@ fn main() -> Result<()> {
                     .with_context(|| "Failed to batch compile")?;
 
                 // Clean up virtual environment if not keeping it
-                if !cli.keep_temp {
-                    info!("Cleaning up temporary virtual environment...");
-                    if let Err(e) = python_env::cleanup_venv() {
-                        warn!("Failed to clean up virtual environment: {}", e);
-                    } else {
-                        info!("Virtual environment cleaned up successfully");
-                    }
-                } else {
+                if cli.keep_temp {
                     let venv_path = python_env::get_venv_path()?;
                     info!("Keeping virtual environment at: {}", venv_path.display());
                     info!(
                         "You can activate it with: {}\\Scripts\\activate",
                         venv_path.display()
                     );
+                } else {
+                    info!("Cleaning up temporary virtual environment...");
+                    if let Err(e) = python_env::cleanup_venv() {
+                        warn!("Failed to clean up virtual environment: {}", e);
+                    } else {
+                        info!("Virtual environment cleaned up successfully");
+                    }
                 }
             }
 

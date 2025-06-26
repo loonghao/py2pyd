@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     test_simple_compilation()?;
 
     // Test 2: Test turbo-cdn integration
-    test_turbo_cdn_integration()?;
+    test_turbo_cdn_integration();
 
     println!("\n✅ All example tests completed!");
     println!("💡 To run the full test suite:");
@@ -105,7 +105,7 @@ AUTHOR = "py2pyd test"
 }
 
 /// Test turbo-cdn integration
-fn test_turbo_cdn_integration() -> Result<()> {
+fn test_turbo_cdn_integration() {
     println!("🌐 Test 2: Turbo-CDN Integration");
     println!("--------------------------------");
 
@@ -128,7 +128,6 @@ fn test_turbo_cdn_integration() -> Result<()> {
     }
 
     println!();
-    Ok(())
 }
 
 /// Compile a Python file using py2pyd
