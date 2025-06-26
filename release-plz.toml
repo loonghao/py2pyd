@@ -20,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 """
 
-# Package-specific configuration for turbo-cdn
+# Package-specific configuration for py2pyd
 [[package]]
-name = "turbo-cdn"
+name = "py2pyd"
 # Enable changelog updates
 changelog_update = true
 # Enable GitHub releases for the main package
