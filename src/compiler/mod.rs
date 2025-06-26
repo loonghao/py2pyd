@@ -12,7 +12,7 @@ use crate::transformer::TransformedModule;
 pub fn compile_file(
     input_path: &Path,
     output_path: &Path,
-    _target: &str, // Unused but kept for backward compatibility
+    _: &str, // Unused but kept for backward compatibility
     optimize_level: u8,
 ) -> Result<()> {
     info!(
@@ -54,7 +54,7 @@ pub fn compile_file(
 pub fn batch_compile(
     input_pattern: &str,
     output_dir: &Path,
-    _target: &str, // Unused but kept for backward compatibility
+    _: &str, // Unused but kept for backward compatibility
     optimize_level: u8,
     recursive: bool,
 ) -> Result<()> {
@@ -107,7 +107,7 @@ pub fn batch_compile(
         }
 
         // Compile the file
-        match compile_file(&input_path, &output_path, _target, optimize_level) {
+        match compile_file(&input_path, &output_path, "", optimize_level) {
             Ok(()) => {
                 success_count += 1;
             }
