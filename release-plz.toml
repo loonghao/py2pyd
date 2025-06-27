@@ -1,12 +1,14 @@
 [workspace]
 # Enable automatic changelog generation
 changelog_update = true
-# Enable GitHub releases for the main package
-git_release_enable = true
+# Disable workspace-level GitHub releases (handled by package level)
+git_release_enable = false
 # Enable automatic tag creation
 git_tag_enable = true
 # Enable processing for releases
 release = true
+# Disable publishing to crates.io at workspace level
+publish = false
 
 # Changelog configuration
 [changelog]
@@ -31,7 +33,13 @@ git_release_enable = true
 release = true
 # Standard tag format (triggers release workflows)
 git_tag_name = "v{{version}}"
+# Don't publish to crates.io (this is a binary tool)
+publish = false
 # Allow major version bumps for breaking changes
 allow_dirty = false
 # Ensure proper semantic versioning
 semver_check = true
+# Release draft mode (false for automatic releases)
+git_release_draft = false
+# Include pre-release versions
+git_release_latest = true
