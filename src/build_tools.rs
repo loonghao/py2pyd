@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use log::debug;
+use std::fmt::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use which::which;
@@ -22,22 +23,22 @@ pub struct BuildTools {
 
 impl BuildTools {
     /// Check if MSVC is available
-    pub fn has_msvc(&self) -> bool {
+    pub const fn has_msvc(&self) -> bool {
         self.msvc.is_some()
     }
 
     /// Check if MinGW is available
-    pub fn has_mingw(&self) -> bool {
+    pub const fn has_mingw(&self) -> bool {
         self.mingw.is_some() && self.dlltool.is_some()
     }
 
     /// Check if GCC is available (for Unix systems)
-    pub fn has_gcc(&self) -> bool {
+    pub const fn has_gcc(&self) -> bool {
         self.gcc.is_some()
     }
 
     /// Check if Xcode Command Line Tools are available (for macOS)
-    pub fn has_xcode(&self) -> bool {
+    pub const fn has_xcode(&self) -> bool {
         self.xcode.is_some()
     }
 
@@ -51,27 +52,27 @@ impl BuildTools {
         let mut info = String::new();
 
         if let Some(msvc) = &self.msvc {
-            info.push_str(&format!("MSVC: {}\n", msvc.display()));
+            writeln!(info, "MSVC: {}", msvc.display()).unwrap();
         }
 
         if let Some(mingw) = &self.mingw {
-            info.push_str(&format!("MinGW: {}\n", mingw.display()));
+            writeln!(info, "MinGW: {}", mingw.display()).unwrap();
         }
 
         if let Some(dlltool) = &self.dlltool {
-            info.push_str(&format!("dlltool: {}\n", dlltool.display()));
+            writeln!(info, "dlltool: {}", dlltool.display()).unwrap();
         }
 
         if let Some(vs) = &self.vs {
-            info.push_str(&format!("Visual Studio: {}\n", vs.display()));
+            writeln!(info, "Visual Studio: {}", vs.display()).unwrap();
         }
 
         if let Some(gcc) = &self.gcc {
-            info.push_str(&format!("GCC: {}\n", gcc.display()));
+            writeln!(info, "GCC: {}", gcc.display()).unwrap();
         }
 
         if let Some(xcode) = &self.xcode {
-            info.push_str(&format!("Xcode Command Line Tools: {}\n", xcode.display()));
+            writeln!(info, "Xcode Command Line Tools: {}", xcode.display()).unwrap();
         }
 
         if info.is_empty() {
@@ -104,7 +105,7 @@ pub fn detect_build_tools() -> BuildTools {
                 let output_str = String::from_utf8_lossy(&output.stdout);
                 if let Some(line) = output_str.lines().next() {
                     if line.contains("Microsoft") {
-                        debug!("MSVC version info: {}", line);
+                        debug!("MSVC version info: {line}");
                     }
                 }
             }
@@ -126,7 +127,7 @@ pub fn detect_build_tools() -> BuildTools {
             }
         }
         Err(e) => {
-            debug!("MSVC compiler not found in PATH: {}", e);
+            debug!("MSVC compiler not found in PATH: {e}");
         }
     }
 
@@ -137,7 +138,7 @@ pub fn detect_build_tools() -> BuildTools {
             tools.mingw = Some(path);
         }
         Err(e) => {
-            debug!("MinGW compiler not found in PATH: {}", e);
+            debug!("MinGW compiler not found in PATH: {e}");
         }
     }
 
@@ -148,7 +149,7 @@ pub fn detect_build_tools() -> BuildTools {
             tools.dlltool = Some(path);
         }
         Err(e) => {
-            debug!("dlltool not found in PATH: {}", e);
+            debug!("dlltool not found in PATH: {e}");
         }
     }
 
@@ -160,7 +161,7 @@ pub fn detect_build_tools() -> BuildTools {
                 tools.gcc = Some(path);
             }
             Err(e) => {
-                debug!("GCC compiler not found in PATH: {}", e);
+                debug!("GCC compiler not found in PATH: {e}");
             }
         }
     }
@@ -185,7 +186,7 @@ pub fn detect_build_tools() -> BuildTools {
                 }
             }
             Err(e) => {
-                debug!("xcode-select not found in PATH: {}", e);
+                debug!("xcode-select not found in PATH: {e}");
             }
         }
     }
@@ -213,7 +214,7 @@ After installation, try running py2pyd again.
 "#
         .to_string()
     } else {
-        r#"
+        r"
 To install the required build tools on Linux/macOS:
 
 1. On Ubuntu/Debian:
@@ -224,7 +225,7 @@ To install the required build tools on Linux/macOS:
    xcode-select --install
 
 After installation, try running py2pyd again.
-"#
+"
         .to_string()
     }
 }

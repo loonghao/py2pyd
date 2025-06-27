@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use log::{debug, info};
 use rustpython_parser::ast;
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 /// Represents a transformed Python module
@@ -15,10 +16,7 @@ pub struct TransformedModule {
 /// Transform a Python AST into Rust code using `PyO3`
 pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) -> String {
     info!("Transforming Python AST to Rust code");
-    debug!(
-        "Module name: {}, Optimization level: {}",
-        module_name, optimize_level
-    );
+    debug!("Module name: {module_name}, Optimization level: {optimize_level}");
 
     // This is a simplified implementation
     // In a real implementation, we would analyze the AST and generate
@@ -31,25 +29,19 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
     rust_code.push_str("use pyo3::wrap_pyfunction;\n\n");
 
     // Generate module
-    rust_code.push_str(&format!(
-        "#[pymodule]\nfn {}(_py: Python, m: &PyModule) -> PyResult<()> {{\n",
-        module_name
-    ));
+    writeln!(rust_code, "#[pymodule]\nfn {module_name}(_py: Python, m: &PyModule) -> PyResult<()> {{").unwrap();
 
     // Transform functions
     for func in crate::parser::extract_functions(ast) {
         if let ast::Stmt::FunctionDef(func_def) = func {
-            rust_code.push_str(&format!(
-                "    m.add_function(wrap_pyfunction!({}, m)?)?;\n",
-                func_def.name
-            ));
+            writeln!(rust_code, "    m.add_function(wrap_pyfunction!({}, m)?)?;", func_def.name).unwrap();
         }
     }
 
     // Transform classes
     for class in crate::parser::extract_classes(ast) {
         if let ast::Stmt::ClassDef(class_def) = class {
-            rust_code.push_str(&format!("    m.add_class::<{}>()?;\n", class_def.name));
+            writeln!(rust_code, "    m.add_class::<{}>()?;", class_def.name).unwrap();
         }
     }
 
@@ -59,10 +51,7 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
     // Generate function implementations
     for func in crate::parser::extract_functions(ast) {
         if let ast::Stmt::FunctionDef(func_def) = func {
-            rust_code.push_str(&format!(
-                "#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{\n",
-                func_def.name
-            ));
+            writeln!(rust_code, "#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{", func_def.name).unwrap();
             rust_code.push_str("    // Auto-generated function implementation\n");
             rust_code.push_str("    Ok(py.None())\n");
             rust_code.push_str("}\n\n");
@@ -72,14 +61,14 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
     // Generate class implementations
     for class in crate::parser::extract_classes(ast) {
         if let ast::Stmt::ClassDef(class_def) = class {
-            rust_code.push_str(&format!("#[pyclass]\nstruct {} {{\n", class_def.name));
+            writeln!(rust_code, "#[pyclass]\nstruct {} {{", class_def.name).unwrap();
             rust_code.push_str("    // Auto-generated class implementation\n");
             rust_code.push_str("}\n\n");
 
-            rust_code.push_str(&format!("#[pymethods]\nimpl {} {{\n", class_def.name));
+            writeln!(rust_code, "#[pymethods]\nimpl {} {{", class_def.name).unwrap();
             rust_code.push_str("    #[new]\n");
             rust_code.push_str("    fn new() -> Self {\n");
-            rust_code.push_str(&format!("        {}{{ }}\n", class_def.name));
+            writeln!(rust_code, "        {}{{ }}", class_def.name).unwrap();
             rust_code.push_str("    }\n");
             rust_code.push_str("}\n\n");
         }
@@ -93,42 +82,40 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
 pub fn generate_cargo_toml(module_name: &str, optimize_level: u8) -> String {
     let mut cargo_toml = String::new();
 
-    cargo_toml.push_str(&format!("[package]\n"));
-    cargo_toml.push_str(&format!("name = \"{}\"\n", module_name));
-    cargo_toml.push_str(&format!("version = \"0.1.0\"\n"));
-    cargo_toml.push_str(&format!("edition = \"2021\"\n\n"));
+    cargo_toml.push_str("[package]\n");
+    writeln!(cargo_toml, "name = \"{module_name}\"").unwrap();
+    cargo_toml.push_str("version = \"0.1.0\"\n");
+    cargo_toml.push_str("edition = \"2021\"\n\n");
 
-    cargo_toml.push_str(&format!("[lib]\n"));
-    cargo_toml.push_str(&format!("name = \"{}\"\n", module_name));
-    cargo_toml.push_str(&format!("crate-type = [\"cdylib\"]\n\n"));
+    cargo_toml.push_str("[lib]\n");
+    writeln!(cargo_toml, "name = \"{module_name}\"").unwrap();
+    cargo_toml.push_str("crate-type = [\"cdylib\"]\n\n");
 
     // Add maturin configuration
-    cargo_toml.push_str(&format!("[package.metadata.maturin]\n"));
-    cargo_toml.push_str(&format!("name = \"{}\"\n", module_name));
-    cargo_toml.push_str(&format!("binding = \"pyo3\"\n"));
-    cargo_toml.push_str(&format!("strip = true\n\n"));
+    cargo_toml.push_str("[package.metadata.maturin]\n");
+    writeln!(cargo_toml, "name = \"{module_name}\"").unwrap();
+    cargo_toml.push_str("binding = \"pyo3\"\n");
+    cargo_toml.push_str("strip = true\n\n");
 
-    cargo_toml.push_str(&format!("[dependencies]\n"));
-    cargo_toml.push_str(&format!(
-        "pyo3 = {{ version = \"0.19\", features = [\"extension-module\"] }}\n"
-    ));
+    cargo_toml.push_str("[dependencies]\n");
+    cargo_toml.push_str("pyo3 = { version = \"0.19\", features = [\"extension-module\"] }\n");
 
     // Add optimization flags
-    cargo_toml.push_str(&format!("\n[profile.release]\n"));
+    cargo_toml.push_str("\n[profile.release]\n");
     match optimize_level {
         0 => {
-            cargo_toml.push_str(&format!("opt-level = 0\n"));
+            cargo_toml.push_str("opt-level = 0\n");
         }
         1 => {
-            cargo_toml.push_str(&format!("opt-level = 1\n"));
+            cargo_toml.push_str("opt-level = 1\n");
         }
         2 => {
-            cargo_toml.push_str(&format!("opt-level = 2\n"));
+            cargo_toml.push_str("opt-level = 2\n");
         }
         _ => {
-            cargo_toml.push_str(&format!("opt-level = 3\n"));
-            cargo_toml.push_str(&format!("lto = true\n"));
-            cargo_toml.push_str(&format!("codegen-units = 1\n"));
+            cargo_toml.push_str("opt-level = 3\n");
+            cargo_toml.push_str("lto = true\n");
+            cargo_toml.push_str("codegen-units = 1\n");
         }
     }
 

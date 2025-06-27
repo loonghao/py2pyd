@@ -113,7 +113,7 @@ DEFAULT_GREETING = hello_world()
                 println!("Compiled file size: {} bytes", metadata.len());
             }
             Err(e) => {
-                println!("❌ Compilation failed: {}", e);
+                println!("❌ Compilation failed: {e}");
                 // Don't fail the test immediately, let's see what went wrong
                 println!("This might be expected if build tools are not available");
             }
@@ -211,7 +211,7 @@ class DataProcessor:
                 println!("Compiled file size: {} bytes", metadata.len());
             }
             Err(e) => {
-                println!("❌ Compilation failed: {}", e);
+                println!("❌ Compilation failed: {e}");
                 println!("This might be expected - some imports might not be supported");
             }
         }
@@ -230,7 +230,7 @@ class DataProcessor:
         let files_to_create = vec![
             (
                 "math_utils.py",
-                r#"
+                r"
 def add(a, b):
     return a + b
 
@@ -239,11 +239,11 @@ def multiply(a, b):
 
 def power(base, exp):
     return base ** exp
-"#,
+",
             ),
             (
                 "string_utils.py",
-                r#"
+                r"
 def reverse_string(s):
     return s[::-1]
 
@@ -252,11 +252,11 @@ def count_words(text):
 
 def capitalize_words(text):
     return ' '.join(word.capitalize() for word in text.split())
-"#,
+",
             ),
             (
                 "list_utils.py",
-                r#"
+                r"
 def find_max(numbers):
     return max(numbers) if numbers else None
 
@@ -265,7 +265,7 @@ def find_min(numbers):
 
 def average(numbers):
     return sum(numbers) / len(numbers) if numbers else 0
-"#,
+",
             ),
         ];
 
@@ -274,7 +274,7 @@ def average(numbers):
             let file_path = test_dir.join(filename);
             fs::write(&file_path, content)?;
             created_files.push(file_path);
-            println!("Created: {}", filename);
+            println!("Created: {filename}");
         }
 
         // Try to compile each file
@@ -286,7 +286,7 @@ def average(numbers):
 
         for python_file in &created_files {
             let file_stem = python_file.file_stem().unwrap().to_string_lossy();
-            let output_file = output_dir.join(format!("{}.pyd", file_stem));
+            let output_file = output_dir.join(format!("{file_stem}.pyd"));
 
             match compile_python_file_with_py2pyd(python_file, &output_file) {
                 Ok(()) => {
@@ -308,11 +308,11 @@ def average(numbers):
         }
 
         println!("Batch compilation results:");
-        println!("  ✅ Successful: {}", successful_compilations);
-        println!("  ❌ Failed: {}", failed_compilations);
+        println!("  ✅ Successful: {successful_compilations}");
+        println!("  ❌ Failed: {failed_compilations}");
         println!(
             "  📊 Success rate: {:.1}%",
-            (successful_compilations as f64 / created_files.len() as f64) * 100.0
+            (f64::from(successful_compilations) / created_files.len() as f64) * 100.0
         );
 
         Ok(())
