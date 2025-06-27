@@ -95,7 +95,7 @@ AUTHOR = "py2pyd test"
             }
         }
         Err(e) => {
-            println!("❌ Compilation failed: {}", e);
+            println!("❌ Compilation failed: {e}");
             println!("💡 This might be expected if build tools are not available");
         }
     }
@@ -118,11 +118,11 @@ fn test_turbo_cdn_integration() {
     match test_url_optimization(test_url) {
         Ok(optimized_url) => {
             println!("✅ URL optimization successful!");
-            println!("   Original: {}", test_url);
-            println!("   Optimized: {}", optimized_url);
+            println!("   Original: {test_url}");
+            println!("   Optimized: {optimized_url}");
         }
         Err(e) => {
-            println!("❌ URL optimization failed: {}", e);
+            println!("❌ URL optimization failed: {e}");
             println!("💡 This might be expected without internet connection");
         }
     }

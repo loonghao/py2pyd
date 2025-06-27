@@ -38,10 +38,7 @@ pub fn create_venv_with_uv_and_version(uv_path: &Path, python_version: &str) -> 
         .arg(venv_dir.to_str().unwrap())
         .status()
         .with_context(|| {
-            format!(
-                "Failed to execute uv venv create with Python {}",
-                python_version
-            )
+            format!("Failed to execute uv venv create with Python {python_version}")
         })?;
 
     if !status.success() {
