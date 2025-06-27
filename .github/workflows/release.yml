@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  # Method 1: Use reusable workflow (recommended for most cases)
-  release-reusable:
+  # Use reusable release workflow from rust-actions-toolkit
+  release:
     uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v2.1.3
     with:
       # Binary name (auto-detected from Cargo.toml if not provided)
@@ -19,7 +19,7 @@ jobs:
       rust-toolchain: stable
       # Enable Python wheels (false for this project)
       enable-python-wheels: false
-      # Target platforms aligned with rust-toolkit v2.1.1
+      # Target platforms for zero-dependency builds
       target-platforms: |
         [
           {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
@@ -32,49 +32,4 @@ jobs:
           {"target": "aarch64-apple-darwin", "os": "macos-13"}
         ]
     secrets: inherit
-
-  # Method 2: Smart release for additional flexibility (if needed)
-  smart-release:
-    name: Smart Release (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    if: false  # Disabled by default, enable if you need custom behavior
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: x86_64-pc-windows-gnu, os: ubuntu-latest }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
-          - { target: x86_64-apple-darwin, os: macos-13 }
-    steps:
-      - uses: actions/checkout@v4
-
-      # Zero-config smart release - handles everything automatically
-      - uses: loonghao/rust-actions-toolkit/actions/smart-release@v2.1.3
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          target: ${{ matrix.target }}
-
-  # Method 3: Manual release with full control (alternative approach)
-  manual-release:
-    name: Manual Release (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    if: false  # Disabled by default, enable for custom control
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: x86_64-pc-windows-gnu, os: ubuntu-latest }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
-          - { target: x86_64-apple-darwin, os: macos-13 }
-    steps:
-      - uses: actions/checkout@v4
-
-      # Use the main action with full control
-      - uses: loonghao/rust-actions-toolkit@v2.1.3
-        with:
-          command: release
-          target: ${{ matrix.target }}
-          binary-name: py2pyd
-          rust-toolchain: stable
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
