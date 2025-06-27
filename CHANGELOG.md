@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/loonghao/py2pyd/compare/v0.1.2...v0.1.3) - 2025-06-27
+
+### Added
+
+- upgrade to rust-actions-toolkit v2.2.3 and simplify workflows
+- upgrade to rust-actions-toolkit v2.1.3 and fix release-plz issues
+- upgrade to rust-actions-toolkit v2.1.1 with enhanced release artifacts
+- upgrade to rust-toolkit v2.1.1 and enhance release artifacts
+
+### Fixed
+
+- resolve remaining clippy pedantic warnings
+- resolve all clippy warnings and improve code quality
+- correct rust-actions-toolkit version to v2.2.0
+- remove unnecessary config file and correct workflow parameters
+
+### Other
+
+- *(deps)* update loonghao/rust-actions-toolkit action to v2.2.0
+- *(deps)* update loonghao/rust-actions-toolkit action to v2.1.4
+
 ## [0.1.2](https://github.com/loonghao/py2pyd/compare/v0.1.1...v0.1.2) - 2025-06-27
 
 ### Fixed
