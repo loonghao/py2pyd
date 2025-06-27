@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
+use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -190,9 +191,8 @@ pub fn batch_compile(
     })?;
 
     // Collect all Python files matching the pattern
-    let python_files = collect_python_files(input_pattern, recursive).with_context(|| {
-        format!("Failed to collect Python files from pattern: {input_pattern}")
-    })?;
+    let python_files = collect_python_files(input_pattern, recursive)
+        .with_context(|| format!("Failed to collect Python files from pattern: {input_pattern}"))?;
 
     info!("Found {} Python files to compile", python_files.len());
 
@@ -310,8 +310,6 @@ fn generate_setup_py(
 
     // Setup the extension module
     setup_py.push_str("setup(\n");
-    use std::fmt::Write;
-
     writeln!(setup_py, "    name='{module_name}',").unwrap();
     setup_py.push_str("    version='0.1',\n");
     setup_py.push_str("    ext_modules=[Extension(\n");

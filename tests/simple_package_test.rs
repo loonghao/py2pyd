@@ -310,10 +310,10 @@ def average(numbers):
         println!("Batch compilation results:");
         println!("  ✅ Successful: {successful_compilations}");
         println!("  ❌ Failed: {failed_compilations}");
-        println!(
-            "  📊 Success rate: {:.1}%",
-            (f64::from(successful_compilations) / created_files.len() as f64) * 100.0
-        );
+        #[allow(clippy::cast_precision_loss)]
+        let success_rate =
+            (f64::from(successful_compilations) / created_files.len() as f64) * 100.0;
+        println!("  📊 Success rate: {success_rate:.1}%");
 
         Ok(())
     }

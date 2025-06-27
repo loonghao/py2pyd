@@ -73,12 +73,8 @@ pub fn batch_compile(
     })?;
 
     // Collect all Python files matching the pattern
-    let python_files = collect_python_files(input_pattern, recursive).with_context(|| {
-        format!(
-            "Failed to collect Python files from pattern: {}",
-            input_pattern
-        )
-    })?;
+    let python_files = collect_python_files(input_pattern, recursive)
+        .with_context(|| format!("Failed to collect Python files from pattern: {input_pattern}"))?;
 
     info!("Found {} Python files to compile", python_files.len());
 
@@ -118,10 +114,7 @@ pub fn batch_compile(
         }
     }
 
-    info!(
-        "Batch compilation complete: {} succeeded, {} failed",
-        success_count, failure_count
-    );
+    info!("Batch compilation complete: {success_count} succeeded, {failure_count} failed");
 
     if failure_count > 0 {
         warn!("Some files failed to compile");
@@ -137,7 +130,7 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
     // Check if the pattern is a directory
     let pattern_path = Path::new(pattern);
     if pattern_path.is_dir() {
-        debug!("Pattern is a directory: {}", pattern);
+        debug!("Pattern is a directory: {pattern}");
 
         // Collect Python files from the directory
         if recursive {
@@ -163,9 +156,9 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
         }
     } else {
         // Treat the pattern as a glob pattern
-        debug!("Pattern is a glob pattern: {}", pattern);
+        debug!("Pattern is a glob pattern: {pattern}");
 
-        for entry in glob(pattern).with_context(|| format!("Invalid glob pattern: {}", pattern))? {
+        for entry in glob(pattern).with_context(|| format!("Invalid glob pattern: {pattern}"))? {
             let path = entry?;
             if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {
                 python_files.push(path);

@@ -82,7 +82,7 @@ pub fn initialize_python_env(
                 return Ok(());
             }
             Err(e) => {
-                debug!("Failed to find Python in PATH: {}", e);
+                debug!("Failed to find Python in PATH: {e}");
             }
         }
     }
@@ -94,7 +94,7 @@ pub fn initialize_python_env(
 
     // Create a virtual environment with specified Python version
     let venv_path = if let Some(version) = python_version {
-        info!("Creating virtual environment with Python {}", version);
+        info!("Creating virtual environment with Python {version}");
         create_venv_with_uv_and_version(&uv_path, version)?
     } else {
         info!("Creating virtual environment with default Python");
@@ -173,7 +173,7 @@ fn is_python3_version(version_str: &str) -> Result<bool> {
             let major_version = major_version
                 .as_str()
                 .parse::<u32>()
-                .with_context(|| format!("Failed to parse Python version: {}", version_str))?;
+                .with_context(|| format!("Failed to parse Python version: {version_str}"))?;
             return Ok(major_version >= 3);
         }
     }
@@ -208,10 +208,10 @@ fn setup_uv() -> Result<PathBuf> {
         .with_context(|| format!("Failed to create directory: {}", uv_dir.display()))?;
 
     // Download uv using turbo-cdn
-    info!("Downloading uv v{} from {}", UV_VERSION, UV_WINDOWS_URL);
+    info!("Downloading uv v{UV_VERSION} from {UV_WINDOWS_URL}");
     let zip_path = uv_dir.join("uv.zip");
     smart_download_file(UV_WINDOWS_URL, &zip_path)
-        .with_context(|| format!("Failed to download uv from {}", UV_WINDOWS_URL))?;
+        .with_context(|| format!("Failed to download uv from {UV_WINDOWS_URL}"))?;
 
     // Extract uv
     info!("Extracting uv to {}", uv_dir.display());
@@ -250,7 +250,7 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
     for i in 0..archive.len() {
         let mut file = archive
             .by_index(i)
-            .with_context(|| format!("Failed to read file {} in zip", i))?;
+            .with_context(|| format!("Failed to read file {i} in zip"))?;
 
         let outpath = dest_dir.join(file.name());
 
@@ -362,7 +362,7 @@ pub fn install_package(package: &str) -> Result<()> {
         .parent()
         .ok_or_else(|| anyhow!("Failed to determine Python directory"))?;
 
-    info!("Installing package: {}", package);
+    info!("Installing package: {package}");
 
     // Use uv to install the package
     let mut command = Command::new(&uv_path);
@@ -383,7 +383,7 @@ pub fn install_package(package: &str) -> Result<()> {
 
     let status = command
         .status()
-        .with_context(|| format!("Failed to execute uv pip install for {}", package))?;
+        .with_context(|| format!("Failed to execute uv pip install for {package}"))?;
 
     if !status.success() {
         return Err(anyhow!("Failed to install package: {}", package));

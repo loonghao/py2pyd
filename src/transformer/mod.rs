@@ -29,12 +29,21 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
     rust_code.push_str("use pyo3::wrap_pyfunction;\n\n");
 
     // Generate module
-    writeln!(rust_code, "#[pymodule]\nfn {module_name}(_py: Python, m: &PyModule) -> PyResult<()> {{").unwrap();
+    writeln!(
+        rust_code,
+        "#[pymodule]\nfn {module_name}(_py: Python, m: &PyModule) -> PyResult<()> {{"
+    )
+    .unwrap();
 
     // Transform functions
     for func in crate::parser::extract_functions(ast) {
         if let ast::Stmt::FunctionDef(func_def) = func {
-            writeln!(rust_code, "    m.add_function(wrap_pyfunction!({}, m)?)?;", func_def.name).unwrap();
+            writeln!(
+                rust_code,
+                "    m.add_function(wrap_pyfunction!({}, m)?)?;",
+                func_def.name
+            )
+            .unwrap();
         }
     }
 
@@ -51,7 +60,12 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
     // Generate function implementations
     for func in crate::parser::extract_functions(ast) {
         if let ast::Stmt::FunctionDef(func_def) = func {
-            writeln!(rust_code, "#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{", func_def.name).unwrap();
+            writeln!(
+                rust_code,
+                "#[pyfunction]\nfn {}(py: Python) -> PyResult<PyObject> {{",
+                func_def.name
+            )
+            .unwrap();
             rust_code.push_str("    // Auto-generated function implementation\n");
             rust_code.push_str("    Ok(py.None())\n");
             rust_code.push_str("}\n\n");
