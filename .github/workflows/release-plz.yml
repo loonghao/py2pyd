@@ -12,7 +12,7 @@ permissions:
 jobs:
   release-plz:
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:base
+    container: ghcr.io/loonghao/rust-toolkit:v2.1.1
     if: github.event.repository.fork == false
     steps:
       - uses: actions/checkout@v4

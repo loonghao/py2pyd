@@ -1,0 +1,100 @@
+# rust-toolkit v2.1.1 configuration for py2pyd
+# This configuration optimizes builds for release artifacts
+
+[project]
+name = "py2pyd"
+version = "0.1.1"
+description = "A Rust-based tool to compile Python modules to pyd files"
+
+[build]
+# Enable optimizations for release builds
+optimize_for_size = true
+strip_symbols = true
+enable_lto = true
+
+# Zero-dependency configuration
+static_linking = true
+bundle_dependencies = true
+
+[targets]
+# Windows targets with zero dependencies
+[targets.x86_64-pc-windows-gnu]
+enabled = true
+static_crt = true
+strip = true
+optimize = "size"
+
+[targets.i686-pc-windows-gnu]
+enabled = true
+static_crt = true
+strip = true
+optimize = "size"
+
+# Linux musl targets for static binaries
+[targets.x86_64-unknown-linux-musl]
+enabled = true
+static = true
+strip = true
+optimize = "size"
+
+[targets.aarch64-unknown-linux-musl]
+enabled = true
+static = true
+strip = true
+optimize = "size"
+
+# Standard Linux targets
+[targets.x86_64-unknown-linux-gnu]
+enabled = true
+strip = true
+optimize = "speed"
+
+[targets.aarch64-unknown-linux-gnu]
+enabled = true
+strip = true
+optimize = "speed"
+
+# macOS targets (handled by native runners)
+[targets.x86_64-apple-darwin]
+enabled = true
+strip = true
+optimize = "speed"
+
+[targets.aarch64-apple-darwin]
+enabled = true
+strip = true
+optimize = "speed"
+
+[release]
+# Release artifact configuration
+create_archives = true
+include_readme = true
+include_license = true
+
+# Archive formats by platform
+windows_format = "zip"
+unix_format = "tar.gz"
+
+# Naming convention
+name_template = "py2pyd-{target}"
+
+[dependencies]
+# Optimize dependencies for static linking
+openssl_static = true
+pkg_config_allow_cross = true
+
+[environment]
+# Environment variables for builds
+RUSTFLAGS = "-C target-feature=+crt-static"
+OPENSSL_STATIC = "1"
+PKG_CONFIG_ALLOW_CROSS = "1"
+
+[cache]
+# Enable caching for faster builds
+enabled = true
+key_prefix = "py2pyd-v2.1.1"
+paths = [
+    "target/",
+    "~/.cargo/registry/",
+    "~/.cargo/git/"
+]

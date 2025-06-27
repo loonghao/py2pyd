@@ -25,7 +25,7 @@ jobs:
   zero-dependency-builds:
     name: Zero-Dependency Build (${{ matrix.target }})
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:cross-compile
+    container: ghcr.io/loonghao/rust-toolkit:v2.1.1
     strategy:
       matrix:
         include:

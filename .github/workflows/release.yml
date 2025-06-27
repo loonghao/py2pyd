@@ -13,25 +13,25 @@ jobs:
     strategy:
       matrix:
         include:
-          # Linux builds using Docker container
+          # Linux builds using Docker container with rust-toolkit v2.1.1
           - target: x86_64-pc-windows-gnu
             os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
           - target: i686-pc-windows-gnu
             os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
           # macOS builds using native macOS runner
           - target: x86_64-apple-darwin
             os: macos-latest
@@ -73,11 +73,55 @@ jobs:
 
           echo "✅ Build completed successfully!"
 
+      - name: Prepare release artifacts
+        shell: bash
+        run: |
+          echo "📦 Preparing release artifacts for ${{ matrix.target }}"
+
+          # Create artifacts directory
+          mkdir -p artifacts
+
+          # Determine binary name and extension
+          binary_name="py2pyd"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            binary_name="py2pyd.exe"
+          fi
+
+          binary_path="target/${{ matrix.target }}/release/$binary_name"
+
+          if [[ ! -f "$binary_path" ]]; then
+            echo "❌ Binary not found: $binary_path"
+            exit 1
+          fi
+
+          echo "📁 Binary found: $binary_path"
+          echo "📊 Binary size: $(du -h "$binary_path" | cut -f1)"
+
+          # Create archive based on platform
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            # Windows: Create ZIP archive
+            archive_name="py2pyd-${{ matrix.target }}.zip"
+            cd target/${{ matrix.target }}/release
+            zip "../../../artifacts/$archive_name" "$binary_name"
+            cd ../../..
+          else
+            # Unix: Create tar.gz archive
+            archive_name="py2pyd-${{ matrix.target }}.tar.gz"
+            cd target/${{ matrix.target }}/release
+            tar -czf "../../../artifacts/$archive_name" "$binary_name"
+            cd ../../..
+          fi
+
+          echo "✅ Created archive: artifacts/$archive_name"
+          ls -la artifacts/
+
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            target/${{ matrix.target }}/release/py2pyd*
+          files: artifacts/*
           token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
 
