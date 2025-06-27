@@ -1,6 +1,6 @@
 [package]
 name = "py2pyd"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["longhao <hal.long@outlook.com>"]
 description = "A Rust-based tool to compile Python modules to pyd files"

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/loonghao/py2pyd/compare/v0.1.1...v0.1.2) - 2025-06-27
+
+### Fixed
+
+- resolve macOS cross-compilation issues in release workflow
+- correct package name in release-plz.toml configuration
+
+### Other
+
+- release v0.1.1
+
 ## [0.1.1](https://github.com/loonghao/py2pyd/releases/tag/v0.1.1) - 2025-06-26
 
 ### Added
