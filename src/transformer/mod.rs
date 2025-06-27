@@ -93,42 +93,42 @@ pub fn transform_ast(ast: &ast::Suite, module_name: &str, optimize_level: u8) ->
 pub fn generate_cargo_toml(module_name: &str, optimize_level: u8) -> String {
     let mut cargo_toml = String::new();
 
-    cargo_toml.push_str(&format!("[package]\n"));
-    cargo_toml.push_str(&format!("name = \"{}\"\n", module_name));
-    cargo_toml.push_str(&format!("version = \"0.1.0\"\n"));
-    cargo_toml.push_str(&format!("edition = \"2021\"\n\n"));
+    use std::fmt::Write;
 
-    cargo_toml.push_str(&format!("[lib]\n"));
-    cargo_toml.push_str(&format!("name = \"{}\"\n", module_name));
-    cargo_toml.push_str(&format!("crate-type = [\"cdylib\"]\n\n"));
+    writeln!(cargo_toml, "[package]").unwrap();
+    writeln!(cargo_toml, "name = \"{module_name}\"").unwrap();
+    writeln!(cargo_toml, "version = \"0.1.0\"").unwrap();
+    writeln!(cargo_toml, "edition = \"2021\"\n").unwrap();
+
+    writeln!(cargo_toml, "[lib]").unwrap();
+    writeln!(cargo_toml, "name = \"{module_name}\"").unwrap();
+    writeln!(cargo_toml, "crate-type = [\"cdylib\"]\n").unwrap();
 
     // Add maturin configuration
-    cargo_toml.push_str(&format!("[package.metadata.maturin]\n"));
-    cargo_toml.push_str(&format!("name = \"{}\"\n", module_name));
-    cargo_toml.push_str(&format!("binding = \"pyo3\"\n"));
-    cargo_toml.push_str(&format!("strip = true\n\n"));
+    writeln!(cargo_toml, "[package.metadata.maturin]").unwrap();
+    writeln!(cargo_toml, "name = \"{module_name}\"").unwrap();
+    writeln!(cargo_toml, "binding = \"pyo3\"").unwrap();
+    writeln!(cargo_toml, "strip = true\n").unwrap();
 
-    cargo_toml.push_str(&format!("[dependencies]\n"));
-    cargo_toml.push_str(&format!(
-        "pyo3 = {{ version = \"0.19\", features = [\"extension-module\"] }}\n"
-    ));
+    writeln!(cargo_toml, "[dependencies]").unwrap();
+    writeln!(cargo_toml, "pyo3 = {{ version = \"0.19\", features = [\"extension-module\"] }}").unwrap();
 
     // Add optimization flags
-    cargo_toml.push_str(&format!("\n[profile.release]\n"));
+    writeln!(cargo_toml, "\n[profile.release]").unwrap();
     match optimize_level {
         0 => {
-            cargo_toml.push_str(&format!("opt-level = 0\n"));
+            writeln!(cargo_toml, "opt-level = 0").unwrap();
         }
         1 => {
-            cargo_toml.push_str(&format!("opt-level = 1\n"));
+            writeln!(cargo_toml, "opt-level = 1").unwrap();
         }
         2 => {
-            cargo_toml.push_str(&format!("opt-level = 2\n"));
+            writeln!(cargo_toml, "opt-level = 2").unwrap();
         }
         _ => {
-            cargo_toml.push_str(&format!("opt-level = 3\n"));
-            cargo_toml.push_str(&format!("lto = true\n"));
-            cargo_toml.push_str(&format!("codegen-units = 1\n"));
+            writeln!(cargo_toml, "opt-level = 3").unwrap();
+            writeln!(cargo_toml, "lto = true").unwrap();
+            writeln!(cargo_toml, "codegen-units = 1").unwrap();
         }
     }
 

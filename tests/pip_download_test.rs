@@ -72,18 +72,18 @@ mod pip_download_tests {
             fs::create_dir_all(&output_dir)?;
 
             let file_stem = main_file.file_stem().unwrap().to_string_lossy();
-            let output_file = output_dir.join(format!("{}.pyd", file_stem));
+            let output_file = output_dir.join(format!("{file_stem}.pyd"));
 
             match compile_with_py2pyd(main_file, &output_file) {
                 Ok(()) => {
-                    println!("✅ Successfully compiled {} to pyd", file_stem);
+                    println!("✅ Successfully compiled {file_stem} to pyd");
                     assert!(output_file.exists(), "Compiled file should exist");
 
                     let metadata = fs::metadata(&output_file)?;
                     println!("Compiled file size: {} bytes", metadata.len());
                 }
                 Err(e) => {
-                    println!("❌ Compilation failed: {}", e);
+                    println!("❌ Compilation failed: {e}");
                     // This is not necessarily a test failure - some files might not be compilable
                     println!("Note: This might be expected for complex packages");
                 }
@@ -107,11 +107,11 @@ mod pip_download_tests {
         ];
 
         for (package_name, version) in packages_to_test {
-            println!("\n--- Analyzing package: {} v{} ---", package_name, version);
+            println!("\n--- Analyzing package: {package_name} v{version} ---");
 
             match download_and_extract_package(package_name, version, test_dir) {
                 Ok(package_info) => {
-                    println!("✅ Successfully downloaded {}", package_name);
+                    println!("✅ Successfully downloaded {package_name}");
                     println!("  📁 Extract path: {}", package_info.extract_path.display());
                     println!("  🐍 Python files: {}", package_info.python_files.len());
 
@@ -134,7 +134,7 @@ mod pip_download_tests {
                     }
                 }
                 Err(e) => {
-                    println!("❌ Failed to download {}: {}", package_name, e);
+                    println!("❌ Failed to download {package_name}: {e}");
                 }
             }
         }
@@ -156,8 +156,8 @@ fn download_and_extract_package(
     version: &str,
     work_dir: &Path,
 ) -> Result<PackageInfo> {
-    let package_spec = format!("{}=={}", package_name, version);
-    let download_dir = work_dir.join(format!("download_{}", package_name));
+    let package_spec = format!("{package_name}=={version}");
+    let download_dir = work_dir.join(format!("download_{package_name}"));
     fs::create_dir_all(&download_dir)?;
 
     println!("Downloading {} to {}", package_spec, download_dir.display());
@@ -202,7 +202,7 @@ fn download_and_extract_package(
     println!("Downloaded file: {}", downloaded_file.display());
 
     // Extract the package
-    let extract_dir = work_dir.join(format!("extracted_{}", package_name));
+    let extract_dir = work_dir.join(format!("extracted_{package_name}"));
     fs::create_dir_all(&extract_dir)?;
 
     if downloaded_file.extension().is_some_and(|ext| ext == "whl") {

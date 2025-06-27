@@ -16,11 +16,11 @@ async fn main() -> Result<()> {
     match downloader.get_optimal_url(test_url).await {
         Ok(optimized_url) => {
             println!("✅ URL optimization successful!");
-            println!("Original: {}", test_url);
-            println!("Optimized: {}", optimized_url);
+            println!("Original: {test_url}");
+            println!("Optimized: {optimized_url}");
         }
         Err(e) => {
-            println!("❌ URL optimization failed: {}", e);
+            println!("❌ URL optimization failed: {e}");
         }
     }
 
@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ Smart download failed: {}", e);
+            println!("❌ Smart download failed: {e}");
         }
     }
 
@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ Failed to get CDN URLs: {}", e);
+            println!("❌ Failed to get CDN URLs: {e}");
         }
     }
 
