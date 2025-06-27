@@ -17,15 +17,17 @@ jobs:
       binary-name: "py2pyd"
       # Rust toolchain version
       rust-toolchain: stable
+      # Enable Python wheels (false for this project)
+      enable-python-wheels: false
       # Target platforms aligned with rust-toolkit v2.1.1
       target-platforms: |
         [
-          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-latest"},
-          {"target": "i686-pc-windows-gnu", "os": "ubuntu-latest"},
-          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-latest"},
-          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-latest"},
-          {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest"},
-          {"target": "aarch64-unknown-linux-gnu", "os": "ubuntu-latest"},
+          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
+          {"target": "i686-pc-windows-gnu", "os": "ubuntu-22.04"},
+          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-22.04"},
+          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"},
+          {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-22.04"},
+          {"target": "aarch64-unknown-linux-gnu", "os": "ubuntu-22.04"},
           {"target": "x86_64-apple-darwin", "os": "macos-13"},
           {"target": "aarch64-apple-darwin", "os": "macos-13"}
         ]
