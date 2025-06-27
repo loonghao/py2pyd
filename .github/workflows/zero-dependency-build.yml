@@ -22,10 +22,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Option 1: Use reusable CI workflow (recommended)
+  ci-reusable:
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v2.1.1
+    with:
+      # Rust toolchain version
+      rust-toolchain: stable
+      # Enable coverage reporting
+      enable-coverage: false
+      # Disable Python wheel testing for this project
+      enable-python-wheel: false
+      # Additional target platforms for zero-dependency testing
+      additional-targets: |
+        [
+          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-latest"},
+          {"target": "i686-pc-windows-gnu", "os": "ubuntu-latest"},
+          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-latest"},
+          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-latest"}
+        ]
+
+  # Option 2: Custom zero-dependency builds (for detailed verification)
   zero-dependency-builds:
     name: Zero-Dependency Build (${{ matrix.target }})
     runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:v2.1.1
     strategy:
       matrix:
         include:
@@ -46,29 +65,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check Rust version
-        shell: bash
-        run: |
-          echo "🦀 Checking Rust version..."
-          rustc --version
-          echo "📦 Cargo version:"
-          cargo --version
-
-      - name: Build zero-dependency binary
-        shell: bash
-        run: |
-          echo "🚀 Building zero-dependency binary for ${{ matrix.target }}"
-          echo "📦 Target: ${{ matrix.name }}"
-
-          # Set environment for zero-dependency builds
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          export OPENSSL_STATIC=1
-          export PKG_CONFIG_ALLOW_CROSS=1
-
-          # Build the binary
-          cargo build --release --target ${{ matrix.target }}
-
-          echo "✅ Build completed successfully!"
+      # Use rust-actions-toolkit for building with zero dependencies
+      - name: Build with rust-actions-toolkit
+        uses: loonghao/rust-actions-toolkit@v2.1.1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          binary-name: py2pyd
+          rust-toolchain: stable
       
       - name: Verify zero dependencies
         if: matrix.verify

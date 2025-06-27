@@ -9,119 +9,70 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # Method 1: Use reusable workflow (recommended for most cases)
+  release-reusable:
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v2.1.1
+    with:
+      # Binary name (auto-detected from Cargo.toml if not provided)
+      binary-name: "py2pyd"
+      # Rust toolchain version
+      rust-toolchain: stable
+      # Target platforms aligned with rust-toolkit v2.1.1
+      target-platforms: |
+        [
+          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-latest"},
+          {"target": "i686-pc-windows-gnu", "os": "ubuntu-latest"},
+          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-latest"},
+          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-latest"},
+          {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest"},
+          {"target": "aarch64-unknown-linux-gnu", "os": "ubuntu-latest"},
+          {"target": "x86_64-apple-darwin", "os": "macos-13"},
+          {"target": "aarch64-apple-darwin", "os": "macos-13"}
+        ]
+    secrets: inherit
+
+  # Method 2: Smart release for additional flexibility (if needed)
+  smart-release:
+    name: Smart Release (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    if: false  # Disabled by default, enable if you need custom behavior
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # Linux builds using Docker container with rust-toolkit v2.1.1
-          - target: x86_64-pc-windows-gnu
-            os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
-          - target: i686-pc-windows-gnu
-            os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            container: ghcr.io/loonghao/rust-toolkit:v2.1.1
-          # macOS builds using native macOS runner
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: aarch64-apple-darwin
-            os: macos-latest
-    runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container }}
+          - { target: x86_64-pc-windows-gnu, os: ubuntu-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: x86_64-apple-darwin, os: macos-13 }
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain (macOS only)
-        if: matrix.os == 'macos-latest'
-        uses: dtolnay/rust-toolchain@stable
+      # Zero-config smart release - handles everything automatically
+      - uses: loonghao/rust-actions-toolkit/actions/smart-release@v2.1.1
         with:
-          targets: ${{ matrix.target }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          target: ${{ matrix.target }}
 
-      - name: Check Rust version
-        shell: bash
-        run: |
-          echo "🦀 Checking Rust version..."
-          rustc --version
-          echo "📦 Cargo version:"
-          cargo --version
+  # Method 3: Manual release with full control (alternative approach)
+  manual-release:
+    name: Manual Release (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    if: false  # Disabled by default, enable for custom control
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-pc-windows-gnu, os: ubuntu-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: x86_64-apple-darwin, os: macos-13 }
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build release binary
-        shell: bash
-        run: |
-          echo "🚀 Building release binary for ${{ matrix.target }}"
-
-          # Set environment for zero-dependency builds (Linux/Windows only)
-          if [[ "${{ matrix.os }}" != "macos-latest" ]]; then
-            export RUSTFLAGS="-C target-feature=+crt-static"
-            export OPENSSL_STATIC=1
-            export PKG_CONFIG_ALLOW_CROSS=1
-          fi
-
-          # Build the binary
-          cargo build --release --target ${{ matrix.target }}
-
-          echo "✅ Build completed successfully!"
-
-      - name: Prepare release artifacts
-        shell: bash
-        run: |
-          echo "📦 Preparing release artifacts for ${{ matrix.target }}"
-
-          # Create artifacts directory
-          mkdir -p artifacts
-
-          # Determine binary name and extension
-          binary_name="py2pyd"
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            binary_name="py2pyd.exe"
-          fi
-
-          binary_path="target/${{ matrix.target }}/release/$binary_name"
-
-          if [[ ! -f "$binary_path" ]]; then
-            echo "❌ Binary not found: $binary_path"
-            exit 1
-          fi
-
-          echo "📁 Binary found: $binary_path"
-          echo "📊 Binary size: $(du -h "$binary_path" | cut -f1)"
-
-          # Create archive based on platform
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            # Windows: Create ZIP archive
-            archive_name="py2pyd-${{ matrix.target }}.zip"
-            cd target/${{ matrix.target }}/release
-            zip "../../../artifacts/$archive_name" "$binary_name"
-            cd ../../..
-          else
-            # Unix: Create tar.gz archive
-            archive_name="py2pyd-${{ matrix.target }}.tar.gz"
-            cd target/${{ matrix.target }}/release
-            tar -czf "../../../artifacts/$archive_name" "$binary_name"
-            cd ../../..
-          fi
-
-          echo "✅ Created archive: artifacts/$archive_name"
-          ls -la artifacts/
-
-      - name: Upload release artifacts
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      # Use the main action with full control
+      - uses: loonghao/rust-actions-toolkit@v2.1.1
         with:
-          files: artifacts/*
-          token: ${{ secrets.GITHUB_TOKEN }}
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+          command: release
+          target: ${{ matrix.target }}
+          binary-name: py2pyd
+          rust-toolchain: stable
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
