@@ -81,7 +81,7 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
         .with_context(|| format!("Failed to write setup.py to {}", setup_py_path.display()))?;
 
     // Copy the Python source file to the temp directory
-    let source_path = temp_dir_path.join(format!("{}.py", module_name));
+    let source_path = temp_dir_path.join(format!("{module_name}.py"));
     fs::write(&source_path, source_code)
         .with_context(|| format!("Failed to write source file to {}", source_path.display()))?;
 
@@ -191,10 +191,7 @@ pub fn batch_compile(
 
     // Collect all Python files matching the pattern
     let python_files = collect_python_files(input_pattern, recursive).with_context(|| {
-        format!(
-            "Failed to collect Python files from pattern: {}",
-            input_pattern
-        )
+        format!("Failed to collect Python files from pattern: {input_pattern}")
     })?;
 
     info!("Found {} Python files to compile", python_files.len());
@@ -235,10 +232,7 @@ pub fn batch_compile(
         }
     }
 
-    info!(
-        "Batch compilation complete: {} succeeded, {} failed",
-        success_count, failure_count
-    );
+    info!("Batch compilation complete: {success_count} succeeded, {failure_count} failed");
 
     if failure_count > 0 {
         warn!("Some files failed to compile");
@@ -254,7 +248,7 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
     // Check if the pattern is a directory
     let pattern_path = Path::new(pattern);
     if pattern_path.is_dir() {
-        debug!("Pattern is a directory: {}", pattern);
+        debug!("Pattern is a directory: {pattern}");
 
         // Collect Python files from the directory
         if recursive {
@@ -280,10 +274,10 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
         }
     } else {
         // Treat the pattern as a glob pattern
-        debug!("Pattern is a glob pattern: {}", pattern);
+        debug!("Pattern is a glob pattern: {pattern}");
 
         for entry in
-            glob::glob(pattern).with_context(|| format!("Invalid glob pattern: {}", pattern))?
+            glob::glob(pattern).with_context(|| format!("Invalid glob pattern: {pattern}"))?
         {
             let path = entry?;
             if path.is_file() && path.extension().map_or(false, |ext| ext == "py") {
@@ -316,11 +310,13 @@ fn generate_setup_py(
 
     // Setup the extension module
     setup_py.push_str("setup(\n");
-    setup_py.push_str(&format!("    name='{}',\n", module_name));
+    use std::fmt::Write;
+
+    writeln!(setup_py, "    name='{module_name}',").unwrap();
     setup_py.push_str("    version='0.1',\n");
-    setup_py.push_str(&format!("    ext_modules=[Extension(\n"));
-    setup_py.push_str(&format!("        '{}',\n", module_name));
-    setup_py.push_str(&format!("        sources=['{}.py'],\n", module_name));
+    setup_py.push_str("    ext_modules=[Extension(\n");
+    writeln!(setup_py, "        '{module_name}',").unwrap();
+    writeln!(setup_py, "        sources=['{module_name}.py'],").unwrap();
 
     // Add custom include paths if needed in the future
     // Currently not used

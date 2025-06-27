@@ -136,7 +136,7 @@ fn main() -> Result<()> {
             });
 
             info!("Compiling {} to {}", input.display(), output.display());
-            info!("Optimization level: {}", optimize);
+            info!("Optimization level: {optimize}");
 
             // Parse additional packages
             let packages = cli
@@ -195,7 +195,7 @@ fn main() -> Result<()> {
                 } else {
                     info!("Cleaning up temporary virtual environment...");
                     if let Err(e) = python_env::cleanup_venv() {
-                        warn!("Failed to clean up virtual environment: {}", e);
+                        warn!("Failed to clean up virtual environment: {e}");
                     } else {
                         info!("Virtual environment cleaned up successfully");
                     }
@@ -211,7 +211,7 @@ fn main() -> Result<()> {
             recursive,
         } => {
             info!("Batch compiling from {} to {}", input, output.display());
-            info!("Optimization level: {}", optimize);
+            info!("Optimization level: {optimize}");
 
             // Parse additional packages
             let packages = cli
@@ -270,7 +270,7 @@ fn main() -> Result<()> {
                 } else {
                     info!("Cleaning up temporary virtual environment...");
                     if let Err(e) = python_env::cleanup_venv() {
-                        warn!("Failed to clean up virtual environment: {}", e);
+                        warn!("Failed to clean up virtual environment: {e}");
                     } else {
                         info!("Virtual environment cleaned up successfully");
                     }

@@ -389,7 +389,7 @@ pub fn install_package(package: &str) -> Result<()> {
         return Err(anyhow!("Failed to install package: {}", package));
     }
 
-    info!("Package installed successfully: {}", package);
+    info!("Package installed successfully: {package}");
     Ok(())
 }
 
@@ -416,7 +416,7 @@ pub fn set_python_env_vars() -> Result<()> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    debug!("Python test: {}", stdout);
+    debug!("Python test: {stdout}");
 
     Ok(())
 }

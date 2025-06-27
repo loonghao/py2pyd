@@ -195,7 +195,7 @@ impl UvEnv {
             .arg(module)
             .args(args)
             .status()
-            .with_context(|| format!("Failed to execute Python module: {}", module))?;
+            .with_context(|| format!("Failed to execute Python module: {module}"))?;
 
         if !status.success() {
             return Err(anyhow!("Python module failed: {}", module));
@@ -214,7 +214,7 @@ impl UvEnv {
             .arg(package)
             .env("VIRTUAL_ENV", &self.venv_path)
             .status()
-            .with_context(|| format!("Failed to install package: {}", package))?;
+            .with_context(|| format!("Failed to install package: {package}"))?;
 
         if !status.success() {
             return Err(anyhow!("Failed to install package: {}", package));

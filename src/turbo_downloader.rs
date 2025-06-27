@@ -99,7 +99,7 @@ pub fn fallback_download_file(url: &str, dest: &Path) -> Result<()> {
             .get(url)
             .send()
             .await
-            .with_context(|| format!("Failed to download from {}", url))?;
+            .with_context(|| format!("Failed to download from {url}"))?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -136,11 +136,11 @@ pub fn smart_download_file(url: &str, dest: &Path) -> Result<()> {
                 return Ok(());
             }
             Err(e) => {
-                warn!("Turbo-cdn download failed: {}, falling back to reqwest", e);
+                warn!("Turbo-cdn download failed: {e}, falling back to reqwest");
             }
         },
         Err(e) => {
-            warn!("Failed to create turbo downloader: {}, using fallback", e);
+            warn!("Failed to create turbo downloader: {e}, using fallback");
         }
     }
 
@@ -168,7 +168,7 @@ mod tests {
         let result = smart_download_file("https://httpbin.org/get", &dest);
         // Note: This test might fail in CI without internet access
         // In a real test environment, you'd mock the HTTP calls
-        println!("Smart download result: {:?}", result);
+        println!("Smart download result: {result:?}");
     }
 
     #[test]
@@ -180,12 +180,12 @@ mod tests {
         // This test might fail without internet access
         match downloader.get_optimized_url(test_url) {
             Ok(optimized) => {
-                println!("Original: {}", test_url);
-                println!("Optimized: {}", optimized);
+                println!("Original: {test_url}");
+                println!("Optimized: {optimized}");
                 assert!(!optimized.is_empty());
             }
             Err(e) => {
-                println!("Failed to get optimized URL (expected in CI): {}", e);
+                println!("Failed to get optimized URL (expected in CI): {e}");
             }
         }
     }

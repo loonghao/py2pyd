@@ -6,7 +6,7 @@ use tempfile::TempDir;
 
 /// Download a pip package to a specified directory
 fn download_pip_package(package_name: &str, version: &str, target_dir: &Path) -> Result<PathBuf> {
-    let package_spec = format!("{}=={}", package_name, version);
+    let package_spec = format!("{package_name}=={version}");
     let download_dir = target_dir.join("downloads");
     fs::create_dir_all(&download_dir)?;
 
@@ -220,8 +220,8 @@ mod pip_package_tests {
         }
 
         println!("Compilation results:");
-        println!("  ✅ Successful: {}", successful_compilations);
-        println!("  ❌ Failed: {}", failed_compilations);
+        println!("  ✅ Successful: {successful_compilations}");
+        println!("  ❌ Failed: {failed_compilations}");
 
         // We expect at least some files to compile successfully
         assert!(
