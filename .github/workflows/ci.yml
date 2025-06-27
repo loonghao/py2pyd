@@ -16,44 +16,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Use reusable CI workflow from rust-actions-toolkit (includes code quality checks)
   ci:
-    runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:base
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check Rust version
-        run: |
-          echo "🦀 Checking Rust version for malachite compatibility..."
-          rustc --version
-          echo "📦 Cargo version:"
-          cargo --version
-        shell: bash
-
-      - name: Check formatting
-        shell: bash
-        run: |
-          echo "🎨 Checking code formatting..."
-          cargo fmt --all --check
-
-      - name: Run clippy
-        shell: bash
-        run: |
-          echo "📎 Running clippy lints..."
-          cargo clippy --all-targets --all-features -- -D warnings -A clippy::too_many_lines -A clippy::uninlined_format_args -A clippy::format_push_string
-
-      - name: Check documentation
-        shell: bash
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: |
-          echo "📚 Checking documentation..."
-          cargo doc --no-deps --document-private-items --workspace
-
-      - name: Run tests
-        shell: bash
-        run: |
-          echo "🧪 Running tests..."
-          cargo test --verbose --workspace
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v2.2.3
+    with:
+      # Rust toolchain version
+      rust-toolchain: stable
+      # Enable coverage reporting
+      enable-coverage: false
+      # Disable Python wheel testing for this project
+      enable-python-wheel: false
+      # Additional target platforms for zero-dependency testing
+      additional-targets: |
+        [
+          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
+          {"target": "i686-pc-windows-gnu", "os": "ubuntu-22.04"},
+          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-22.04"},
+          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"}
+        ]
 
 
