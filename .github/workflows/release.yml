@@ -10,29 +10,48 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    container: ghcr.io/loonghao/rust-toolkit:cross-compile
     strategy:
       matrix:
-        target:
-          # Zero-dependency Windows builds
-          - x86_64-pc-windows-gnu
-          - i686-pc-windows-gnu
-          # Static Linux builds
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-musl
-          # Standard builds
-          - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
-          - x86_64-apple-darwin
-          - aarch64-apple-darwin
+        include:
+          # Linux builds using Docker container
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+          - target: i686-pc-windows-gnu
+            os: ubuntu-latest
+            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            container: ghcr.io/loonghao/rust-toolkit:cross-compile
+          # macOS builds using native macOS runner
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (macOS only)
+        if: matrix.os == 'macos-latest'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Check Rust version
         shell: bash
         run: |
-          echo "🦀 Checking Rust version in Docker container..."
+          echo "🦀 Checking Rust version..."
           rustc --version
           echo "📦 Cargo version:"
           cargo --version
@@ -42,10 +61,12 @@ jobs:
         run: |
           echo "🚀 Building release binary for ${{ matrix.target }}"
 
-          # Set environment for zero-dependency builds
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          export OPENSSL_STATIC=1
-          export PKG_CONFIG_ALLOW_CROSS=1
+          # Set environment for zero-dependency builds (Linux/Windows only)
+          if [[ "${{ matrix.os }}" != "macos-latest" ]]; then
+            export RUSTFLAGS="-C target-feature=+crt-static"
+            export OPENSSL_STATIC=1
+            export PKG_CONFIG_ALLOW_CROSS=1
+          fi
 
           # Build the binary
           cargo build --release --target ${{ matrix.target }}
