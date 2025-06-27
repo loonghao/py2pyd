@@ -24,7 +24,7 @@ concurrency:
 jobs:
   # Option 1: Use reusable CI workflow (recommended)
   ci-reusable:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v2.1.1
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v2.1.3
     with:
       # Rust toolchain version
       rust-toolchain: stable
@@ -67,7 +67,7 @@ jobs:
 
       # Use rust-actions-toolkit for building with zero dependencies
       - name: Build with rust-actions-toolkit
-        uses: loonghao/rust-actions-toolkit@v2.1.1
+        uses: loonghao/rust-actions-toolkit@v2.1.3
         with:
           command: build
           target: ${{ matrix.target }}

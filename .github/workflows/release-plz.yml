@@ -11,17 +11,15 @@ permissions:
 
 jobs:
   release-plz:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release-plz.yml@v2.1.1
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release-plz.yml@v2.1.3
     if: github.event.repository.fork == false
     with:
-      # Optional: Customize Rust toolchain
+      # Rust toolchain version
       rust-toolchain: stable
-      # Optional: Specify release-plz version
-      release_plz_version: v0.5
     secrets:
       # Required: For crates.io publishing (if you publish Rust crates)
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      # Optional: Enhanced GitHub PAT for cross-workflow triggers
+      # Enhanced GitHub PAT for cross-workflow triggers
       # This allows release-plz to trigger other workflows (like release.yml)
       RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
   
