@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release-plz:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release-plz.yml@v2.1.3
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release-plz.yml@v2.1.4
     if: github.event.repository.fork == false
     with:
       # Rust toolchain version
