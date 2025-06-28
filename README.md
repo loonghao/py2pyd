@@ -65,6 +65,26 @@ cargo build --release
 
 The binary will be available at `target/release/py2pyd` (or `py2pyd.exe` on Windows).
 
+### Cross-Compilation Support
+
+This project includes enhanced cross-compilation support based on [rust-actions-toolkit](https://github.com/loonghao/rust-actions-toolkit) best practices:
+
+- **Windows targets**: Properly configured for `x86_64-pc-windows-gnu` and `i686-pc-windows-gnu`
+- **Memory allocator compatibility**: Resolved `libmimalloc-sys` build errors in cross-compilation environments
+- **Enhanced toolchain**: Pre-configured `Cross.toml` with proper environment variables
+
+To test cross-compilation locally:
+```bash
+# Install cross-compilation tool
+cargo install cross
+
+# Test Windows targets
+cross build --target x86_64-pc-windows-gnu --release
+cross build --target i686-pc-windows-gnu --release
+```
+
+For troubleshooting cross-compilation issues, see the [rust-actions-toolkit documentation](https://github.com/loonghao/rust-actions-toolkit/blob/master/docs/CROSS_COMPILATION_ISSUES.md).
+
 ## Usage
 
 ```bash
