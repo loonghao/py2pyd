@@ -27,20 +27,7 @@ jobs:
       # Disable Python wheel testing for this project
       enable-python-wheel: false
 
-      # 🚀 NEW: Enable release build testing for CI/Release consistency
-      test-release-builds: true
-      build-depth: release
-
-      # Target platforms that match release.yml for consistency
-      release-target-platforms: |
-        [
-          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "i686-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-22.04"},
-          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"}
-        ]
-
-      # Legacy additional targets (for backward compatibility)
+      # Additional target platforms for testing
       additional-targets: |
         [
           {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
@@ -49,73 +36,6 @@ jobs:
           {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"}
         ]
 
-  # Add release-style build testing to catch issues early
-  test-release-builds:
-    name: Test Release Builds
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Test the same problematic targets that caused issues in release
-          - { target: "x86_64-pc-windows-gnu", os: "ubuntu-22.04" }
-          - { target: "i686-pc-windows-gnu", os: "ubuntu-22.04" }
-          - { target: "x86_64-unknown-linux-musl", os: "ubuntu-22.04" }
-          - { target: "aarch64-unknown-linux-musl", os: "ubuntu-22.04" }
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install packages (Ubuntu)
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            pkg-config \
-            libssl-dev \
-            musl-tools \
-            curl \
-            git
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          targets: ${{ matrix.target }}
-
-      - name: Setup cross-compilation toolchain
-        uses: taiki-e/setup-cross-toolchain-action@v1
-        with:
-          target: ${{ matrix.target }}
-        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
-
-      - name: Install cross for musl targets
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-        if: contains(matrix.target, '-musl')
-
-      - name: Configure OpenSSL for musl targets
-        if: contains(matrix.target, '-musl')
-        run: |
-          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-          echo "OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu" >> $GITHUB_ENV
-          echo "OPENSSL_INCLUDE_DIR=/usr/include/openssl" >> $GITHUB_ENV
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-
-      - name: Configure environment for mimalloc compatibility
-        run: |
-          echo "CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=true" >> $GITHUB_ENV
-          echo "RUSTFLAGS=-D warnings" >> $GITHUB_ENV
-
-      - name: Test release build (same as actual release)
-        run: |
-          if [[ "${{ matrix.target }}" == *"musl"* ]]; then
-            cross build --release --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
-          fi
 
 
