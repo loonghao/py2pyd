@@ -12,10 +12,9 @@ jobs:
   # Use reusable release workflow from rust-actions-toolkit
   # This includes zero-dependency builds for all target platforms
   release:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v2.3.2
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v2.4.1
     with:
-      # Binary name (auto-detected from Cargo.toml)
-      # binary-name: "py2pyd"  # Let it auto-detect from Cargo.toml
+      # Binary name auto-detected from Cargo.toml in v2.4.1
       # Rust toolchain version
       rust-toolchain: stable
       # Disable Python wheels for this binary project
