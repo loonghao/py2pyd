@@ -35,7 +35,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
 dependencies = [
  "cfg-if",
- "getrandom 0.3.3",
  "once_cell",
  "version_check",
  "zerocopy",
@@ -3082,7 +3081,6 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f42b805f45a23d6b01ce89ef8db2190e85df7669d01e024d257f60235e5fac9b"
 dependencies = [
- "ahash",
  "anyhow",
  "async-trait",
  "brotli",
