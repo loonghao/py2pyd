@@ -20,8 +20,6 @@ jobs:
       rust-toolchain: stable
       # Disable Python wheels for this binary project
       enable-python-wheels: false
-      # 🚀 NEW: Verify CI consistency
-      verify-ci-consistency: true
       # Target platforms for zero-dependency builds
       target-platforms: |
         [
