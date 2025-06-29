@@ -9,6 +9,7 @@ repository = "https://github.com/loonghao/py2pyd"
 readme = "README.md"
 keywords = ["python", "pyd", "compiler", "dcc", "extension"]
 categories = ["command-line-utilities", "development-tools"]
+build = "build.rs"
 
 [[bin]]
 name = "py2pyd"
@@ -41,8 +42,18 @@ regex = "1.9"
 reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
 zip = "4.0"
 uuid = { version = "1.4", features = ["v4"] }
-turbo-cdn = "0.4.1"
+turbo-cdn = { version = "0.4.1", default-features = false }
 tokio = { version = "1.0", features = ["full"] }
+
+# Override mimalloc dependency to fix cross-compilation issues
+[dependencies.mimalloc]
+version = "0.1"
+optional = true
+
+[features]
+default = []
+# Enable mimalloc only for native builds
+mimalloc = ["dep:mimalloc"]
 
 [dev-dependencies]
 assert_cmd = "2.0"
