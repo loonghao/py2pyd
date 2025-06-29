@@ -7,6 +7,10 @@ passthrough = [
     "OPENSSL_LIB_DIR",
     "OPENSSL_INCLUDE_DIR",
     "PKG_CONFIG_ALLOW_CROSS",
+    # mimalloc cross-compilation environment variables
+    "CARGO_CFG_TARGET_OS",
+    "CARGO_CFG_TARGET_ARCH",
+    "CARGO_CFG_TARGET_ENV",
     "PKG_CONFIG_PATH",
     "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER",
     "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER",
@@ -35,6 +39,20 @@ pre-build = [
     "apt-get update && apt-get install -y libssl-dev:arm64 pkg-config"
 ]
 
+[target.aarch64-unknown-linux-musl.env]
+# Fix linker architecture mismatch
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER = "aarch64-linux-musl-gcc"
+CC_aarch64_unknown_linux_musl = "aarch64-linux-musl-gcc"
+CXX_aarch64_unknown_linux_musl = "aarch64-linux-musl-g++"
+AR_aarch64_unknown_linux_musl = "aarch64-linux-musl-ar"
+# Disable mimalloc for musl targets
+CARGO_CFG_TARGET_OS = "linux"
+CARGO_CFG_TARGET_ENV = "musl"
+CARGO_FEATURE_MIMALLOC = "0"
+MIMALLOC_OVERRIDE = "0"
+# Fix Rust toolchain issues
+RUSTFLAGS = "-C target-feature=-crt-static"
+
 # Configuration for GNU targets
 [target.aarch64-unknown-linux-gnu]
 image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
@@ -55,6 +73,12 @@ CC_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-gcc-posix"
 CXX_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-g++-posix"
 AR_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-ar"
 CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG = "true"
+# Disable mimalloc for Windows GNU targets to avoid compilation errors
+CARGO_CFG_TARGET_OS = "windows"
+CARGO_CFG_TARGET_ENV = "gnu"
+# Force disable mimalloc features
+CARGO_FEATURE_MIMALLOC = "0"
+MIMALLOC_OVERRIDE = "0"
 
 # Add i686 Windows target for better compatibility
 [target.i686-pc-windows-gnu]
@@ -68,6 +92,12 @@ CC_i686_pc_windows_gnu = "i686-w64-mingw32-gcc-posix"
 CXX_i686_pc_windows_gnu = "i686-w64-mingw32-g++-posix"
 AR_i686_pc_windows_gnu = "i686-w64-mingw32-ar"
 CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG = "true"
+# Disable mimalloc for Windows GNU targets to avoid compilation errors
+CARGO_CFG_TARGET_OS = "windows"
+CARGO_CFG_TARGET_ENV = "gnu"
+# Force disable mimalloc features
+CARGO_FEATURE_MIMALLOC = "0"
+MIMALLOC_OVERRIDE = "0"
 
 [target.aarch64-pc-windows-msvc]
 image = "ghcr.io/cross-rs/aarch64-pc-windows-msvc:main"
