@@ -15,12 +15,9 @@ fn main() {
 
     if should_enable_mimalloc {
         println!("cargo:rustc-cfg=feature=\"mimalloc\"");
-        println!("cargo:warning=Enabling mimalloc for target: {}", target);
+        println!("cargo:warning=Enabling mimalloc for target: {target}");
     } else {
-        println!(
-            "cargo:warning=Disabling mimalloc for cross-compilation target: {}",
-            target
-        );
+        println!("cargo:warning=Disabling mimalloc for cross-compilation target: {target}");
         // Set environment variables to disable mimalloc in dependencies
         println!("cargo:rustc-env=CARGO_FEATURE_MIMALLOC=0");
         println!("cargo:rustc-env=MIMALLOC_OVERRIDE=0");
