@@ -18,7 +18,7 @@ concurrency:
 jobs:
   # Use reusable CI workflow from rust-actions-toolkit (includes code quality checks)
   ci:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v2.2.0
+    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v4.0.0
     with:
       # Rust toolchain version
       rust-toolchain: stable
