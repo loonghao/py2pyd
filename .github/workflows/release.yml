@@ -8,30 +8,63 @@ on:
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
 jobs:
-  # Use reusable release workflow from rust-actions-toolkit
-  # This includes zero-dependency builds for all target platforms
-  release:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-release.yml@v2.4.1
-    with:
-      # Binary name auto-detected from Cargo.toml in v2.4.1
-      # Rust toolchain version
-      rust-toolchain: stable
-      # Disable Python wheels for this binary project
-      enable-python-wheels: false
-      # 🚀 Verify CI consistency (v2.3.2 feature)
-      verify-ci-consistency: true
-      # Target platforms for zero-dependency builds
-      target-platforms: |
-        [
-          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "i686-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-22.04"},
-          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"},
-          {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-22.04"},
-          {"target": "aarch64-unknown-linux-gnu", "os": "ubuntu-22.04"},
-          {"target": "x86_64-apple-darwin", "os": "macos-13"},
-          {"target": "aarch64-apple-darwin", "os": "macos-13"}
-        ]
-    secrets: inherit
+  upload-assets:
+    name: Upload release assets
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux targets
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-22.04
+          # macOS targets
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: aarch64-apple-darwin
+            os: macos-13
+          # Windows targets
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-22.04
+          - target: i686-pc-windows-gnu
+            os: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup cross-compilation toolchain
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
+      - name: Install cross for musl targets
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+        if: contains(matrix.target, '-musl')
+      - name: Set Windows MSVC flags
+        run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
+        if: endsWith(matrix.target, 'windows-msvc')
+      - name: Upload binary
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: py2pyd
+          target: ${{ matrix.target }}
+          tar: all
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
 
