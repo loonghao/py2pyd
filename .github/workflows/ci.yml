@@ -16,38 +16,97 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Use reusable CI workflow from rust-actions-toolkit (includes code quality checks)
-  ci:
-    uses: loonghao/rust-actions-toolkit/.github/workflows/reusable-ci.yml@v2.4.1
-    with:
-      # Rust toolchain version
-      rust-toolchain: stable
-      # Enable coverage reporting
-      enable-coverage: false
-      # Disable Python wheel testing for this project
-      enable-python-wheel: false
+  # Code quality checks
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-      # 🚀 Enable release build testing for CI/Release consistency
-      test-release-builds: true
-      build-depth: release
+  # Testing across platforms
+  test:
+    name: Test - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --verbose --workspace
+      - name: Run tests
+        run: cargo test --verbose --workspace
 
-      # Target platforms that match release.yml for consistency
-      release-target-platforms: |
-        [
-          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "i686-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-22.04"},
-          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"}
-        ]
+  # Cross-compilation testing using turbo-cdn approach
+  cross-compile:
+    name: Cross-compile - ${{ matrix.target }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+          - target: i686-pc-windows-gnu
+          - target: x86_64-unknown-linux-musl
+          - target: aarch64-unknown-linux-musl
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup cross-compilation toolchain
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+        if: ${{ !contains(matrix.target, '-musl') }}
+      - name: Install cross for musl targets
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+        if: ${{ contains(matrix.target, '-musl') }}
+      - name: Build with cross (musl targets)
+        run: cross build --release --target ${{ matrix.target }}
+        if: ${{ contains(matrix.target, '-musl') }}
+      - name: Build with cargo (non-musl targets)
+        run: cargo build --release --target ${{ matrix.target }}
+        if: ${{ !contains(matrix.target, '-musl') }}
 
-      # Legacy additional targets (for backward compatibility)
-      additional-targets: |
-        [
-          {"target": "x86_64-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "i686-pc-windows-gnu", "os": "ubuntu-22.04"},
-          {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-22.04"},
-          {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-22.04"}
-        ]
+  # Formatting check
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+  # Documentation check
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --document-private-items --workspace
 
 
 
