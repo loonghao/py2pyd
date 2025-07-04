@@ -18,9 +18,15 @@ fn main() {
         println!("cargo:warning=Enabling mimalloc for target: {target}");
     } else {
         println!("cargo:warning=Disabling mimalloc for cross-compilation target: {target}");
-        // Set environment variables to disable mimalloc in dependencies
+        // Set multiple environment variables to disable mimalloc in dependencies
         println!("cargo:rustc-env=CARGO_FEATURE_MIMALLOC=0");
         println!("cargo:rustc-env=MIMALLOC_OVERRIDE=0");
+        println!("cargo:rustc-env=MIMALLOC_DISABLE=1");
+        // Disable mimalloc compilation entirely for problematic targets
+        if target.contains("windows-gnu") || target.contains("mingw") {
+            println!("cargo:rustc-env=LIBMIMALLOC_SYS_DISABLE=1");
+            println!("cargo:rustc-cfg=feature=\"disable-mimalloc\"");
+        }
     }
 }
 
@@ -38,6 +44,9 @@ fn should_use_mimalloc(target: &str, host: &str) -> bool {
         "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-musl",
         "aarch64-unknown-linux-gnu",
+        // Add more Windows GNU variants to be safe
+        "i686-w64-mingw32",
+        "x86_64-w64-mingw32",
     ];
 
     if problematic_targets.iter().any(|&t| target.contains(t)) {
