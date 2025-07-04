@@ -56,5 +56,3 @@ fn should_use_mimalloc(target: &str, host: &str) -> bool {
     // For other cross-compilation targets, be conservative
     false
 }
-
-
