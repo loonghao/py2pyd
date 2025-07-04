@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/loonghao/py2pyd/compare/v0.1.3...v0.1.4) - 2025-07-04
+
+### Added
+
+- comprehensive cross-compilation fixes and CI improvements
+- adopt turbo-cdn cross-compilation approach for better compatibility
+- upgrade to turbo-cdn v0.4.3 and simplify cross-compilation
+- comprehensive mimalloc cross-compilation fix
+- upgrade to rust-actions-toolkit v2.4.1 with auto binary detection
+- upgrade to rust-actions-toolkit v2.3.2 with full consistency features
+
+### Fixed
+
+- *(deps)* update rust crate tokio to v1.46.0
+- *(deps)* update rust crate reqwest to v0.12.22
+- strengthen mimalloc disabling for Windows GNU targets
+- resolve clippy uninlined_format_args warnings in build.rs
+- remove explicit binary-name to allow auto-detection
+- remove unsupported parameters from rust-actions-toolkit v2.3.0
+- resolve libmimalloc-sys v0.1.43 build error
+
+### Other
+
+- fix formatting in build.rs
+- format build.rs code for better readability
+- upgrade rust-actions-toolkit to v2.3.0 with consistency improvements
+- add release-style build testing to catch cross-compilation issues early
+- add cross-compilation documentation and test script
+
 ## [0.1.3](https://github.com/loonghao/py2pyd/compare/v0.1.2...v0.1.3) - 2025-06-27
 
 ### Added
