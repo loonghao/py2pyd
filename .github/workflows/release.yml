@@ -5,16 +5,20 @@ on:
     tags:
       - "v*"
 
+# We need this to be able to create releases.
 permissions:
   contents: write
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
 
 jobs:
   upload-assets:
     name: Upload release assets
+    # Only run if this is a turbo-cdn release (not other packages in workspace)
+    if: startsWith(github.ref_name, 'v')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -36,37 +40,30 @@ jobs:
           # Windows targets
           - target: x86_64-pc-windows-msvc
             os: windows-2022
-          - target: x86_64-pc-windows-gnu
-            os: ubuntu-22.04
-          - target: i686-pc-windows-gnu
-            os: ubuntu-22.04
+          - target: aarch64-pc-windows-msvc
+            os: windows-2022
     timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Setup cross-compilation toolchain
-        uses: taiki-e/setup-cross-toolchain-action@v1
+
+      - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
-      - name: Install cross for musl targets
-        uses: taiki-e/install-action@v2
+
+      - uses: taiki-e/install-action@v2
         with:
           tool: cross
         if: contains(matrix.target, '-musl')
-      - name: Set Windows MSVC flags
-        run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
+
+      - run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
         if: endsWith(matrix.target, 'windows-msvc')
-      - name: Set Windows GNU environment
-        run: |
-          echo "LIBMIMALLOC_SYS_DISABLE=1" >> "${GITHUB_ENV}"
-          echo "MIMALLOC_OVERRIDE=0" >> "${GITHUB_ENV}"
-          echo "CARGO_FEATURE_MIMALLOC=0" >> "${GITHUB_ENV}"
-        if: contains(matrix.target, 'windows-gnu')
-      - name: Upload binary
-        uses: taiki-e/upload-rust-binary-action@v1
+
+      - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: py2pyd
           target: ${{ matrix.target }}
