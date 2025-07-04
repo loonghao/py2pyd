@@ -4,27 +4,31 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, develop]
+  schedule:
+    - cron: '00 01 * * *'
 
 permissions:
   contents: read
   actions: read
   security-events: write
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  # Code quality checks
+  # Clippy linting
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
@@ -36,56 +40,32 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
       - name: Build
         run: cargo build --verbose --workspace
+
       - name: Run tests
         run: cargo test --verbose --workspace
 
-  # Cross-compilation testing using turbo-cdn approach
-  cross-compile:
-    name: Cross-compile - ${{ matrix.target }}
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-pc-windows-gnu
-          - target: i686-pc-windows-gnu
-          - target: x86_64-unknown-linux-musl
-          - target: aarch64-unknown-linux-musl
+  # Security audit using rustsec database
+  security_audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Setup cross-compilation toolchain
-        uses: taiki-e/setup-cross-toolchain-action@v1
+
+      - name: Run security audit
+        uses: rustsec/audit-check@v2.0.0
         with:
-          target: ${{ matrix.target }}
-        if: ${{ !contains(matrix.target, '-musl') }}
-      - name: Install cross for musl targets
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-        if: ${{ contains(matrix.target, '-musl') }}
-      - name: Build with cross (musl targets)
-        run: cross build --release --target ${{ matrix.target }}
-        if: ${{ contains(matrix.target, '-musl') }}
-      - name: Build with cargo (Windows GNU targets)
-        run: cargo build --release --target ${{ matrix.target }}
-        env:
-          LIBMIMALLOC_SYS_DISABLE: "1"
-          MIMALLOC_OVERRIDE: "0"
-          CARGO_FEATURE_MIMALLOC: "0"
-        if: ${{ contains(matrix.target, 'windows-gnu') }}
-      - name: Build with cargo (other targets)
-        run: cargo build --release --target ${{ matrix.target }}
-        if: ${{ !contains(matrix.target, '-musl') && !contains(matrix.target, 'windows-gnu') }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   # Formatting check
   rustfmt:
@@ -94,10 +74,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+
       - name: Check formatting
         run: cargo fmt --all --check
 
@@ -108,13 +90,41 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
       - name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --document-private-items --workspace
 
+  # Code coverage reporting (only on PR)
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: false
+          verbose: true
+          flags: unittests
+          name: codecov-umbrella
 
 

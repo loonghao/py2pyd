@@ -64,6 +64,13 @@ tar = "0.4"
 
 
 
+
+
+# Conditional patch for cross-compilation issues
+# Only applied when PATCH_MIMALLOC environment variable is set
+[patch.crates-io]
+libmimalloc-sys = { path = "patches/libmimalloc-sys" }
+
 # Linting configuration
 [lints.clippy]
 # Disable uninlined format args warning

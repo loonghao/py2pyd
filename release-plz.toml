@@ -1,14 +1,26 @@
+# Release-plz configuration for py2pyd
+#
+# Strategy: release-plz handles crates.io publishing and creates GitHub releases,
+# while .github/workflows/release.yml builds cross-platform binaries using upload-rust-binary-action.
+#
+# Workflow:
+# 1. release-plz creates tag (v1.0.0) and GitHub release with changelog
+# 2. Tag triggers release.yml workflow for cross-platform binary builds
+# 3. upload-rust-binary-action builds and uploads binaries to the existing release
+# 4. release-plz publishes to crates.io
+#
+# This approach leverages release-plz's strengths (version management, changelog, crates.io)
+# while using the specialized upload-rust-binary-action for cross-platform builds.
+
 [workspace]
 # Enable automatic changelog generation
 changelog_update = true
-# Disable workspace-level GitHub releases (handled by package level)
+# Disable GitHub releases at workspace level (handled by package level)
 git_release_enable = false
-# Enable automatic tag creation
+# Enable automatic tag creation (triggers release.yml)
 git_tag_enable = true
 # Enable processing for releases
 release = true
-# Disable publishing to crates.io at workspace level
-publish = false
 
 # Changelog configuration
 [changelog]
@@ -27,19 +39,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 name = "py2pyd"
 # Enable changelog updates
 changelog_update = true
-# Enable GitHub releases for the main package
+# Enable GitHub releases (release-plz creates draft, release.yml adds binaries and publishes)
 git_release_enable = true
 # Enable processing for releases
 release = true
-# Standard tag format (triggers release workflows)
+# Standard tag format (triggers release workflows) - with 'v' prefix to trigger release.yml
 git_tag_name = "v{{version}}"
-# Don't publish to crates.io (this is a binary tool)
-publish = false
 # Allow major version bumps for breaking changes
 allow_dirty = false
 # Ensure proper semantic versioning
 semver_check = true
-# Release draft mode (false for automatic releases)
+# Create published releases (upload-rust-binary-action will add binaries)
 git_release_draft = false
-# Include pre-release versions
-git_release_latest = true
+# Custom release body template
+git_release_body = """
+## 🚀 What's Changed
+
+{{changelog}}
+
+## 📦 Installation
+
+### Download Binary
+Download the appropriate binary for your platform from the assets below.
+
+### Using Cargo
+```bash
+cargo install py2pyd
+```
+
+### Using Package Managers
+```bash
+# Homebrew (macOS/Linux)
+brew install loonghao/tap/py2pyd
+
+# Scoop (Windows)
+scoop bucket add loonghao https://github.com/loonghao/scoop-bucket
+scoop install py2pyd
+```
+
+## 🔗 Links
+- [Documentation](https://docs.rs/py2pyd)
+- [Examples](https://github.com/loonghao/py2pyd/tree/main/examples)
+- [Changelog](https://github.com/loonghao/py2pyd/blob/main/CHANGELOG.md)
+
+**Full Changelog**: https://github.com/loonghao/py2pyd/compare/{{previous_tag}}...{{version}}
+"""

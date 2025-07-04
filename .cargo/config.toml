@@ -1,17 +1,18 @@
-[build]
-# Use sccache for faster builds
-# rustc-wrapper = "sccache"
+# Cargo configuration for cross-compilation
 
-# Enable parallel compilation
-jobs = 8
+# Windows GNU targets - disable mimalloc to avoid MinGW compilation issues
+[target.x86_64-pc-windows-gnu]
+rustflags = [
+    "-C", "link-arg=-Wl,--allow-multiple-definition",
+]
 
-# Enable incremental compilation
-incremental = true
+[target.i686-pc-windows-gnu]
+rustflags = [
+    "-C", "link-arg=-Wl,--allow-multiple-definition",
+]
 
-# Target-specific configurations removed to avoid proc-macro compilation issues
-# These can be re-enabled later if needed for specific optimizations
-
-[profile.release]
-# Conservative optimization settings to avoid proc-macro issues
-opt-level = 3
-codegen-units = 1
+# Environment variables for Windows GNU targets
+[env]
+# These will be set for all builds, but our build.rs will override them appropriately
+CARGO_FEATURE_MIMALLOC = { value = "0", condition = "cfg(any(target = \"x86_64-pc-windows-gnu\", target = \"i686-pc-windows-gnu\"))" }
+MIMALLOC_OVERRIDE = { value = "0", condition = "cfg(any(target = \"x86_64-pc-windows-gnu\", target = \"i686-pc-windows-gnu\"))" }

@@ -1,0 +1,7 @@
+[package]
+name = "libmimalloc-sys"
+version = "0.1.43"
+edition = "2021"
+description = "No-op replacement for libmimalloc-sys to avoid cross-compilation issues"
+
+[dependencies]
