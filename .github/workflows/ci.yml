@@ -76,9 +76,16 @@ jobs:
       - name: Build with cross (musl targets)
         run: cross build --release --target ${{ matrix.target }}
         if: ${{ contains(matrix.target, '-musl') }}
-      - name: Build with cargo (non-musl targets)
+      - name: Build with cargo (Windows GNU targets)
         run: cargo build --release --target ${{ matrix.target }}
-        if: ${{ !contains(matrix.target, '-musl') }}
+        env:
+          LIBMIMALLOC_SYS_DISABLE: "1"
+          MIMALLOC_OVERRIDE: "0"
+          CARGO_FEATURE_MIMALLOC: "0"
+        if: ${{ contains(matrix.target, 'windows-gnu') }}
+      - name: Build with cargo (other targets)
+        run: cargo build --release --target ${{ matrix.target }}
+        if: ${{ !contains(matrix.target, '-musl') && !contains(matrix.target, 'windows-gnu') }}
 
   # Formatting check
   rustfmt:

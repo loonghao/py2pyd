@@ -59,6 +59,12 @@ jobs:
       - name: Set Windows MSVC flags
         run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
         if: endsWith(matrix.target, 'windows-msvc')
+      - name: Set Windows GNU environment
+        run: |
+          echo "LIBMIMALLOC_SYS_DISABLE=1" >> "${GITHUB_ENV}"
+          echo "MIMALLOC_OVERRIDE=0" >> "${GITHUB_ENV}"
+          echo "CARGO_FEATURE_MIMALLOC=0" >> "${GITHUB_ENV}"
+        if: contains(matrix.target, 'windows-gnu')
       - name: Upload binary
         uses: taiki-e/upload-rust-binary-action@v1
         with:
