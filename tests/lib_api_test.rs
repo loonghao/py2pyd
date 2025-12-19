@@ -425,7 +425,9 @@ def _private_function():
     assert!(!ast.is_empty());
 
     let functions = py2pyd::extract_functions(&ast);
-    assert_eq!(functions.len(), 3); // create_processor, async_operation, _private_function
+    // extract_functions only extracts sync FunctionDef, not AsyncFunctionDef
+    // So we get: create_processor, _private_function (async_operation is AsyncFunctionDef)
+    assert_eq!(functions.len(), 2);
 
     let classes = py2pyd::extract_classes(&ast);
     assert_eq!(classes.len(), 3); // Config, BaseProcessor, DataProcessor

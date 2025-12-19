@@ -62,7 +62,7 @@ def sync_function():
         let functions = py2pyd::extract_functions(&ast);
 
         // Should find both sync and async functions
-        assert!(functions.len() >= 1);
+        assert!(!functions.is_empty());
         Ok(())
     }
 
