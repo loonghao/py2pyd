@@ -401,10 +401,7 @@ class Calculator:
         // Check for balanced braces (simple check)
         let open_braces = rust_code.matches('{').count();
         let close_braces = rust_code.matches('}').count();
-        assert_eq!(
-            open_braces, close_braces,
-            "Braces should be balanced"
-        );
+        assert_eq!(open_braces, close_braces, "Braces should be balanced");
 
         // Check for proper function signatures
         assert!(rust_code.contains("fn "));

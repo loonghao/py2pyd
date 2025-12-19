@@ -56,7 +56,9 @@ pub mod uv_env;
 
 // Re-export commonly used types
 pub use build_tools::{check_build_tools, detect_build_tools, BuildTools};
-pub use compiler::{batch_compile as compiler_batch_compile, compile_file as compiler_compile_file};
+pub use compiler::{
+    batch_compile as compiler_batch_compile, compile_file as compiler_compile_file,
+};
 pub use parser::{
     extract_classes, extract_from_imports, extract_functions, extract_imports, extract_module_vars,
     parse_file, parse_source,
@@ -176,7 +178,13 @@ pub fn batch_compile_legacy(
     optimize_level: u8,
     recursive: bool,
 ) -> Result<()> {
-    compiler::batch_compile(input_pattern, output_dir, "generic", optimize_level, recursive)
+    compiler::batch_compile(
+        input_pattern,
+        output_dir,
+        "generic",
+        optimize_level,
+        recursive,
+    )
 }
 
 /// Get the appropriate extension for compiled Python modules on the current platform.

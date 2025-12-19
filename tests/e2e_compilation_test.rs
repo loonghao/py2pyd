@@ -340,7 +340,11 @@ def reverse(s):
             fs::write(input_dir.join(name), content)?;
         }
 
-        println!("Created {} Python files in {}", files.len(), input_dir.display());
+        println!(
+            "Created {} Python files in {}",
+            files.len(),
+            input_dir.display()
+        );
 
         let output = batch_compile_with_cli(&input_dir, &output_dir, false)?;
 
@@ -527,8 +531,14 @@ def process_data(data):
 
         assert!(output.status.success(), "Help command should succeed");
         assert!(stdout.contains("py2pyd"), "Help should mention py2pyd");
-        assert!(stdout.contains("compile"), "Help should mention compile command");
-        assert!(stdout.contains("batch"), "Help should mention batch command");
+        assert!(
+            stdout.contains("compile"),
+            "Help should mention compile command"
+        );
+        assert!(
+            stdout.contains("batch"),
+            "Help should mention batch command"
+        );
 
         Ok(())
     }
@@ -560,7 +570,10 @@ def process_data(data):
         assert!(output.status.success(), "Compile help should succeed");
         assert!(stdout.contains("--input"), "Should show --input option");
         assert!(stdout.contains("--output"), "Should show --output option");
-        assert!(stdout.contains("--optimize"), "Should show --optimize option");
+        assert!(
+            stdout.contains("--optimize"),
+            "Should show --optimize option"
+        );
 
         Ok(())
     }
@@ -577,7 +590,10 @@ def process_data(data):
         assert!(output.status.success(), "Batch help should succeed");
         assert!(stdout.contains("--input"), "Should show --input option");
         assert!(stdout.contains("--output"), "Should show --output option");
-        assert!(stdout.contains("--recursive"), "Should show --recursive option");
+        assert!(
+            stdout.contains("--recursive"),
+            "Should show --recursive option"
+        );
 
         Ok(())
     }
@@ -725,22 +741,12 @@ def compute(x):
         fs::create_dir_all(&input_dir)?;
 
         // Create test files
-        fs::write(
-            input_dir.join("a.py"),
-            "def func_a(): return 'a'",
-        )?;
-        fs::write(
-            input_dir.join("b.py"),
-            "def func_b(): return 'b'",
-        )?;
+        fs::write(input_dir.join("a.py"), "def func_a(): return 'a'")?;
+        fs::write(input_dir.join("b.py"), "def func_b(): return 'b'")?;
 
         let config = py2pyd::CompileConfig::default();
-        let result = py2pyd::batch_compile(
-            input_dir.to_str().unwrap(),
-            &output_dir,
-            &config,
-            false,
-        );
+        let result =
+            py2pyd::batch_compile(input_dir.to_str().unwrap(), &output_dir, &config, false);
 
         match result {
             Ok(()) => {
