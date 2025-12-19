@@ -33,7 +33,10 @@ mod build_tools_tests {
             || info.contains("Xcode")
             || info.contains("No build tools found");
 
-        assert!(has_tools_info, "Info should contain tool names or 'No build tools found'");
+        assert!(
+            has_tools_info,
+            "Info should contain tool names or 'No build tools found'"
+        );
     }
 
     /// Test check_build_tools returns appropriate result
@@ -84,10 +87,8 @@ mod build_tools_tests {
         let tools = py2pyd::detect_build_tools();
 
         // has_any_tools should be true if any individual check is true
-        let any_individual = tools.has_msvc()
-            || tools.has_mingw()
-            || tools.has_gcc()
-            || tools.has_xcode();
+        let any_individual =
+            tools.has_msvc() || tools.has_mingw() || tools.has_gcc() || tools.has_xcode();
 
         assert_eq!(
             tools.has_any_tools(),
@@ -108,7 +109,10 @@ mod build_tools_tests {
 
         if tools.has_msvc() {
             let info = tools.get_tools_info();
-            assert!(info.contains("MSVC"), "Info should mention MSVC if detected");
+            assert!(
+                info.contains("MSVC"),
+                "Info should mention MSVC if detected"
+            );
         }
     }
 
@@ -123,7 +127,10 @@ mod build_tools_tests {
 
         if tools.has_mingw() {
             let info = tools.get_tools_info();
-            assert!(info.contains("MinGW"), "Info should mention MinGW if detected");
+            assert!(
+                info.contains("MinGW"),
+                "Info should mention MinGW if detected"
+            );
         }
     }
 
@@ -168,15 +175,16 @@ mod build_tools_tests {
 
         // Info should not have leading/trailing whitespace issues
         // (though it might have trailing newlines which is fine)
-        assert!(!info.starts_with('\n'), "Info should not start with newline");
+        assert!(
+            !info.starts_with('\n'),
+            "Info should not start with newline"
+        );
 
         // If tools are found, info should contain paths (with : or \)
         if tools.has_any_tools() {
-            let has_path_separator = info.contains(':') || info.contains('\\') || info.contains('/');
-            assert!(
-                has_path_separator,
-                "Tool info should contain file paths"
-            );
+            let has_path_separator =
+                info.contains(':') || info.contains('\\') || info.contains('/');
+            assert!(has_path_separator, "Tool info should contain file paths");
         }
     }
 
