@@ -11,6 +11,10 @@ keywords = ["python", "pyd", "compiler", "dcc", "extension"]
 categories = ["command-line-utilities", "development-tools"]
 build = "build.rs"
 
+[lib]
+name = "py2pyd"
+path = "src/lib.rs"
+
 [[bin]]
 name = "py2pyd"
 path = "src/main.rs"
