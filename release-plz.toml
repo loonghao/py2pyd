@@ -45,8 +45,6 @@ git_release_enable = true
 release = true
 # Standard tag format (triggers release workflows) - with 'v' prefix to trigger release.yml
 git_tag_name = "v{{version}}"
-# Allow major version bumps for breaking changes
-allow_dirty = false
 # Ensure proper semantic versioning
 semver_check = true
 # Create published releases (upload-rust-binary-action will add binaries)
