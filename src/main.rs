@@ -15,15 +15,7 @@ use env_logger::Env;
 use log::{info, warn};
 use std::path::{Path, PathBuf};
 
-mod build_tools;
-
-mod compiler;
-mod parser;
-mod python_env;
-mod transformer;
-mod turbo_downloader;
-mod uv_compiler;
-mod uv_env;
+use py2pyd::{build_tools, compiler, python_env, uv_compiler};
 
 /// A tool to compile Python modules to pyd files
 #[derive(Parser)]
