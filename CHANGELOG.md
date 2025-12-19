@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5](https://github.com/loonghao/py2pyd/compare/v0.1.4...v0.1.5) - 2025-12-19
+
+### Added
+
+- add library support with lib.rs and comprehensive tests
+
+### Fixed
+
+- remove invalid allow_dirty field from [[package]] section
+- correct test assertions for function extraction and clippy warnings
+
+### Other
+
+- *(deps)* update actions/checkout action to v6
+- *(deps)* update rust crate tempfile to v3.23.0
+- *(deps)* update rust crate regex to v1.12.2
+- improve cross-platform release builds
+- apply rustfmt formatting fixes
+
 ## [0.1.4](https://github.com/loonghao/py2pyd/compare/v0.1.3...v0.1.4) - 2025-07-04
 
 ### Added
