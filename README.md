@@ -1,34 +1,29 @@
 # py2pyd
 
 [![CI](https://github.com/loonghao/py2pyd/actions/workflows/ci.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/loonghao/py2pyd/actions/workflows/code-quality.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/code-quality.yml)
 [![Release](https://github.com/loonghao/py2pyd/actions/workflows/release.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/release.yml)
-[![Zero-Dependency Builds](https://github.com/loonghao/py2pyd/actions/workflows/zero-dependency-build.yml/badge.svg)](https://github.com/loonghao/py2pyd/actions/workflows/zero-dependency-build.yml)
 
-🚀 **A high-performance Rust-based tool to compile Python modules to extension files (.pyd on Windows, .so on Linux/macOS) with zero-dependency executables.**
-
-✨ **Features Docker-powered CI/CD with 5-10x faster builds and truly portable executables that run anywhere without installation.**
+**A high-performance Rust-based tool to compile Python modules to extension files (.pyd on Windows, .so on Linux/macOS) with zero-dependency executables.**
 
 > **Note**: This project is under active development. While core functionality is stable, APIs may evolve. We provide zero-dependency executables for maximum portability.
 
 ## Overview
 
-py2pyd is a high-performance, Rust-based command-line tool that compiles Python (.py) files to Python extension modules (.pyd on Windows, .so on Linux/macOS). Built with modern DevOps practices, it features Docker-powered CI/CD for lightning-fast builds and produces zero-dependency executables for maximum portability.
+py2pyd is a Rust-based command-line tool that compiles Python (.py) files to Python extension modules (.pyd on Windows, .so on Linux/macOS). It resolves a Python interpreter from PATH, `uv`, or an explicit path, drives Cython through a generated `setup.py` inside an isolated `uv` environment, and ships zero-dependency release binaries for Windows, Linux, and macOS.
 
-### 🎯 Key Highlights
+### Key Highlights
 
-- **🚀 Zero-Dependency Executables**: Download and run immediately - no installation required
-- **⚡ Lightning Fast**: Docker-powered builds with 5-10x performance improvements
-- **🌍 Universal Compatibility**: Static binaries work on any Windows system or Linux distribution
-- **🔒 Enterprise Ready**: Enhanced security scanning and strict code quality standards
-- **🐳 Modern CI/CD**: Docker-based pipeline with specialized images for different tasks
+- **Zero-Dependency Executables**: Windows and Linux musl release archives are statically linked - download, extract, and run
+- **Universal Compatibility**: Static binaries work on any Windows system or Linux distribution
+- **Flexible Interpreter Discovery**: PATH lookup, `uv` version selection, or an explicit interpreter path
+- **Cython Under the Hood**: Each build runs through a generated `setup.py` in an isolated `uv` environment
 
-## Features (Planned)
+## Features
 
 - Compile single Python files or entire directories to Python extension modules (.pyd on Windows, .so on Linux/macOS)
 - Support for multiple Python interpreter discovery methods:
   - Default PATH lookup
-  - uv integration with version selection (`--uv-python 3.10`)
+  - uv integration with version selection (`--python-version 3.10`)
   - Explicit interpreter path specification (`--python-path`)
 - Batch processing with recursive directory support
 - Optimization level control
@@ -37,13 +32,13 @@ py2pyd is a high-performance, Rust-based command-line tool that compiles Python 
 
 ## Installation
 
-### 🚀 Download Zero-Dependency Executables
+### Download Zero-Dependency Executables
 
 Download the latest release from the [Releases page](https://github.com/loonghao/py2pyd/releases).
 
 #### Windows (Zero Dependencies)
-- **64-bit**: `py2pyd-x86_64-pc-windows-gnu.zip` - Runs on any Windows system
-- **32-bit**: `py2pyd-i686-pc-windows-gnu.zip` - Compatible with older systems
+- **x86_64**: `py2pyd-x86_64-pc-windows-msvc.zip` - Runs on any Windows system
+- **ARM64**: `py2pyd-aarch64-pc-windows-msvc.zip` - For ARM64 Windows systems
 
 #### Linux (Static Binaries)
 - **64-bit**: `py2pyd-x86_64-unknown-linux-musl.tar.gz` - Works on any Linux distribution
@@ -53,7 +48,7 @@ Download the latest release from the [Releases page](https://github.com/loonghao
 - **Intel**: `py2pyd-x86_64-apple-darwin.tar.gz`
 - **Apple Silicon**: `py2pyd-aarch64-apple-darwin.tar.gz`
 
-> 💡 **Tip**: Windows and Linux musl builds are completely self-contained with zero dependencies. Just download, extract, and run!
+> **Tip**: Windows and Linux musl builds are completely self-contained with zero dependencies. Just download, extract, and run!
 
 ### Build from Source
 
@@ -88,18 +83,48 @@ For troubleshooting cross-compilation issues, see the [rust-actions-toolkit docu
 ## Usage
 
 ```bash
-# Basic usage (uses Python from PATH)
-py2pyd -i input.py -o output.pyd
+# Compile a single file (uv selects the Python interpreter)
+py2pyd compile -i input.py -o output.pyd
 
-# Using uv with specific Python version
-py2pyd --uv-python 3.10 -i input.py -o output.pyd
+# Select a Python version
+py2pyd --python-version 3.10 compile -i input.py -o output.pyd
 
-# Using explicit Python interpreter path
-py2pyd --python-path C:/Python310/python.exe -i input.py -o output.pyd
+# Use an explicit Python interpreter
+py2pyd --python-path C:/Python310/python.exe compile -i input.py -o output.pyd
 
-# Batch processing
-py2pyd --uv-python 3.10 -i src/ -o build/ --recursive
+# Batch compile a directory recursively
+py2pyd --python-version 3.10 batch -i src/ -o build/ --recursive
 ```
+
+### Global Options
+
+These are accepted before the subcommand.
+
+| Option | Description |
+|--------|-------------|
+| `--python-path <PYTHON_PATH>` | Path to Python interpreter |
+| `--python-version <PYTHON_VERSION>` | Python version to use (e.g. `3.9`, `3.10`) |
+| `--keep-temp` | Keep temporary files after compilation |
+| `--use-uv` | Use uv for Python environment management (default: true) |
+| `--packages <PACKAGES>` | Additional Python packages to install (comma-separated) |
+| `-v, --verbose...` | Sets the level of verbosity (`-v`, `-vv`, `-vvv`) |
+
+### `compile`
+
+| Option | Description |
+|--------|-------------|
+| `-i, --input <INPUT>` | Input Python file (required) |
+| `-o, --output <OUTPUT>` | Output pyd file (default: same as input with .pyd extension) |
+| `-O, --optimize <OPTIMIZE>` | Optimization level (0-3) (default: 2) |
+
+### `batch`
+
+| Option | Description |
+|--------|-------------|
+| `-i, --input <INPUT>` | Input directory or glob pattern (required) |
+| `-o, --output <OUTPUT>` | Output directory (required) |
+| `-O, --optimize <OPTIMIZE>` | Optimization level (0-3) (default: 2) |
+| `-r, --recursive` | Recursive search |
 
 ## Requirements
 
@@ -112,7 +137,7 @@ py2pyd --uv-python 3.10 -i src/ -o build/ --recursive
     - **MinGW-w64 (Alternative)**: Install from [here](https://www.mingw-w64.org/downloads/)
   - **Linux**: GCC (install via `sudo apt-get install build-essential` on Debian/Ubuntu)
   - **macOS**: Xcode Command Line Tools (install via `xcode-select --install`)
-- Python interpreter (if not using embedded mode)
+- `uv` for Python environment management (installed automatically if not found), or a local Python interpreter
 
 The tool will automatically check for required build tools and provide installation instructions if they are missing.
 
@@ -122,7 +147,7 @@ py2pyd includes comprehensive tests, including integration tests that download a
 
 ### Quick Tests
 ```bash
-# Run unit tests only
+# Run the default suite: unit tests plus integration tests that need no build tools or network
 cargo test
 ```
 
@@ -138,41 +163,15 @@ cargo test test_compile_simple_python_module -- --ignored
 cargo test test_download_six_package -- --ignored
 ```
 
-For detailed testing information, see [TESTING_GUIDE.md](TESTING_GUIDE.md).
-
-## 🐳 Docker-Powered Development
-
-This project leverages cutting-edge Docker technology for development and CI/CD:
-
-### Performance Improvements
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Cold Start** | 3-5 minutes | 30-60 seconds | **5-10x faster** |
-| **Warm Start** | 1-2 minutes | 10-20 seconds | **3-6x faster** |
-| **Dependencies** | Downloaded each time | Pre-installed | **Consistent** |
-
-### Docker Images Used
-- **`ghcr.io/loonghao/rust-toolkit:base`** - General CI/CD operations
-- **`ghcr.io/loonghao/rust-toolkit:cross-compile`** - Zero-dependency builds
-- **`ghcr.io/loonghao/rust-toolkit:security-audit`** - Enhanced security scanning
-
-### Zero-Dependency Builds
-Our release pipeline produces truly portable executables:
-- **Windows**: No DLL dependencies, runs on any Windows system
-- **Linux**: Static musl binaries work on any distribution
-- **Single File**: Download and run immediately
-
-This ensures maximum compatibility and ease of distribution.
-
 ## TODO List
 
-- [ ] Implement flexible Python interpreter discovery
-  - [ ] PATH-based discovery
-  - [ ] uv integration with version selection
-  - [ ] Explicit path specification
+- [x] Implement flexible Python interpreter discovery
+  - [x] PATH-based discovery
+  - [x] uv integration with version selection (`--python-version 3.10`)
+  - [x] Explicit path specification (`--python-path`)
 - [ ] Improve MSVC compiler detection and integration
-  - [ ] Auto-detection of installed MSVC
-  - [ ] Clear error messages and installation guidance
+  - [x] Auto-detection of installed MSVC
+  - [x] Clear error messages and installation guidance
   - [ ] Investigate minimal MSVC toolchain options
 - [ ] Enhance compilation process
   - [ ] Optimize Cython usage
@@ -193,7 +192,7 @@ This ensures maximum compatibility and ease of distribution.
 
 ## Release Process
 
-This project uses **Semantic Release** with automated CI/CD. Releases are automatically triggered based on [Conventional Commits](https://www.conventionalcommits.org/):
+This project uses [release-plz](https://github.com/release-plz/release-plz) with GitHub Actions. Releases are automatically triggered based on [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Automatic Version Bumping
 
@@ -202,7 +201,7 @@ This project uses **Semantic Release** with automated CI/CD. Releases are automa
 | `feat:` | Minor (0.1.0 → 0.2.0) | `feat: add Python 3.12 support` |
 | `fix:` | Patch (0.1.0 → 0.1.1) | `fix: resolve memory leak in parser` |
 | `feat!:` or `BREAKING CHANGE:` | Major (0.1.0 → 1.0.0) | `feat!: redesign command-line interface` |
-| `docs:`, `chore:`, etc. | Patch (0.1.0 → 0.1.1) | `docs: update installation guide` |
+| `docs:`, `chore:`, etc. | No version bump | `docs: update installation guide` |
 
 ### How to Release
 
@@ -223,9 +222,9 @@ BREAKING CHANGE: The --input flag is now required"
 
 The CI system will automatically:
 1. **Analyze commit messages** to determine version bump
-2. **Update version** in `Cargo.toml`
-3. **Build binaries** for all supported platforms
-4. **Create Git tag** and GitHub release
+2. **Update version** in `Cargo.toml` and the changelog
+3. **Create Git tag** and GitHub release
+4. **Build binaries** for all supported platforms (`.github/workflows/release.yml`)
 5. **Upload artifacts** with generated release notes
 
 For detailed information, see [docs/VERSIONING.md](docs/VERSIONING.md).
