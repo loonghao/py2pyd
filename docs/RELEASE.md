@@ -93,9 +93,7 @@ uses `${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}`.
 
 ## Manual re-release
 
-`release.yml` only reacts to tag pushes. To rebuild binaries for an existing
-tag, re-run the workflow from the Actions tab against that tag, or delete and
-re-push the tag.
+`release.yml` declares only `on: push: tags: ["v*"]` — there is no `workflow_dispatch`, so it cannot be started by hand from the Actions tab. To rebuild binaries for an existing tag, re-run the existing workflow run for that tag, or delete and re-push the tag.
 
 ## Troubleshooting
 

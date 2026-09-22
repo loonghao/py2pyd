@@ -41,13 +41,13 @@ Download the latest release from the [Releases page](https://github.com/loonghao
 
 #### Linux (Static Binaries)
 - **64-bit**: `py2pyd-x86_64-unknown-linux-musl.tar.gz` - Works on any Linux distribution
-- **ARM64**: `py2pyd-aarch64-unknown-linux-musl.tar.gz` - For ARM64 Linux systems
 
 #### macOS
-- **Intel**: `py2pyd-x86_64-apple-darwin.tar.gz`
 - **Apple Silicon**: `py2pyd-aarch64-apple-darwin.tar.gz`
 
-> **Tip**: Windows and Linux musl builds are completely self-contained with zero dependencies. Just download, extract, and run!
+> **Tip**: Windows MSVC and `x86_64-unknown-linux-musl` builds are completely self-contained with zero dependencies. Just download, extract, and run!
+
+Only the archives that actually get published are listed here. `.github/workflows/release.yml` builds eight targets, but `aarch64-unknown-linux-musl` and `x86_64-apple-darwin` have not produced assets in any release so far; see [docs/RELEASE.md](docs/RELEASE.md) for the full matrix.
 
 ### Build from Source
 
