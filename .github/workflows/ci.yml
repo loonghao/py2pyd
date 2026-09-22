@@ -66,6 +66,14 @@ jobs:
         uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # hickory-proto 0.25.2 is pulled in by turbo-cdn, which pins
+          # hickory-resolver = "0.25" as a non-optional dependency.
+          # RUSTSEC-2026-0118 has no patched release at all, and
+          # RUSTSEC-2026-0119 is only fixed in hickory-proto 0.26.1, which
+          # turbo-cdn does not accept. Neither is reachable by a version bump,
+          # so they are ignored until turbo-cdn relaxes its hickory-resolver
+          # requirement. Revisit on every turbo-cdn upgrade.
+          ignore: RUSTSEC-2026-0118,RUSTSEC-2026-0119
 
   # Formatting check
   rustfmt:
