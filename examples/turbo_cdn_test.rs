@@ -3,11 +3,11 @@ use turbo_cdn::TurboCdn;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Test turbo-cdn 0.4.1 API
+    // Test turbo-cdn 0.8 API
     let test_url =
         "https://github.com/astral-sh/uv/releases/download/0.7.6/uv-x86_64-pc-windows-msvc.zip";
 
-    println!("Testing turbo-cdn 0.4.1 API...");
+    println!("Testing turbo-cdn 0.8 API...");
 
     // Create TurboCdn client
     let downloader = TurboCdn::new().await?;
@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
     }
 
     // Test URL optimization check
-    if downloader.can_optimize_url(test_url) {
+    if downloader.can_optimize_url(test_url).await {
         println!("✅ URL can be optimized");
     } else {
         println!("ℹ️ URL cannot be optimized");
