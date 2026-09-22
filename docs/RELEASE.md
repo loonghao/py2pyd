@@ -2,124 +2,119 @@
 
 This document describes the automated release process for py2pyd.
 
-## Automated Release Workflow
+Releases are driven by [release-plz](https://github.com/release-plz/release-plz).
+The authoritative configuration is [`release-plz.toml`](../release-plz.toml); the
+workflows live in `.github/workflows/`.
 
-### How it works
+## Workflows
 
-1. **Version Detection**: When code is pushed to the `main` branch, the CI system automatically checks if the version in `Cargo.toml` has changed.
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Pull requests to `main`, pushes to `main`/`develop`, nightly schedule | Clippy, test matrix (Linux/Windows/macOS), `rustfmt`, `cargo doc`, security audit, coverage |
+| `release-plz.yml` | Push to `main` | Opens the version-bump PR, publishes to crates.io, creates the `v*` tag and the GitHub release |
+| `release.yml` | Push of a `v*` tag | Cross-compiles binaries and attaches them to the existing GitHub release |
 
-2. **Automatic Tagging**: If a new version is detected, the system automatically creates a Git tag (e.g., `v0.1.1`) and pushes it to the repository.
+There is no `auto-release.yml` or `semantic-release.yml` in this repository.
 
-3. **Multi-platform Builds**: The system builds binaries for multiple platforms:
-   - Windows (x86_64)
-   - Linux (x86_64)
-   - macOS (x86_64 and ARM64)
+## How a release happens
 
-4. **Release Creation**: A GitHub release is automatically created with:
-   - Release notes generated from commit messages
-   - Binary artifacts for all platforms
-   - Proper versioning and tagging
+1. **Land conventional commits** on `main`. The commit types decide the next
+   version — see [docs/VERSIONING.md](VERSIONING.md).
 
-### Triggering a Release
+2. **Merge the release-plz PR.** The `release-plz-pr` job runs
+   `release-plz release-pr`, which computes the next version, bumps `version` in
+   `Cargo.toml`, regenerates `CHANGELOG.md`, and opens (or updates) a release PR.
 
-To trigger an automatic release:
+3. **Publishing.** Once the bumped version is on `main`, the
+   `release-plz-release` job runs `release-plz release`, which:
+   - publishes the crate to crates.io using `CARGO_REGISTRY_TOKEN`;
+   - creates the Git tag `v{{version}}` (from `git_tag_name` in
+     `release-plz.toml`);
+   - creates the GitHub release, non-draft, with the body template defined in
+     `git_release_body`.
 
-1. **Update the version** in `Cargo.toml`:
-   ```toml
-   [package]
-   version = "0.1.1"  # Increment this version
-   ```
+4. **Binary builds.** The `v*` tag triggers `release.yml`, which builds every
+   matrix target and attaches the archives to the release that release-plz
+   already created.
 
-2. **Commit and push** to main branch:
-   ```bash
-   git add Cargo.toml
-   git commit -m "bump: version 0.1.1"
-   git push origin main
-   ```
+The `v` prefix on `git_tag_name` is load-bearing: `release.yml` only listens for
+tags matching `v*`. Changing one without the other breaks binary publishing.
 
-3. **Wait for CI**: The automated release workflow will:
-   - Detect the version change
-   - Build binaries for all platforms
-   - Create a Git tag
-   - Create a GitHub release with artifacts
+## Build matrix
 
-### Manual Release
+Defined in `.github/workflows/release.yml`:
 
-For manual releases or re-releases, you can use the Manual Release workflow:
+| Target | Runner | Build method |
+|--------|--------|--------------|
+| `x86_64-unknown-linux-gnu` | `ubuntu-22.04` | `taiki-e/setup-cross-toolchain-action` |
+| `x86_64-unknown-linux-musl` | `ubuntu-22.04` | `cross` |
+| `aarch64-unknown-linux-gnu` | `ubuntu-22.04` | `cross` |
+| `aarch64-unknown-linux-musl` | `ubuntu-22.04` | `cross` |
+| `x86_64-apple-darwin` | `macos-13` | native |
+| `aarch64-apple-darwin` | `macos-14` | native |
+| `x86_64-pc-windows-msvc` | `windows-2022` | native |
+| `aarch64-pc-windows-msvc` | `windows-2022` | native |
 
-1. Go to **Actions** tab in GitHub
-2. Select **Manual Release** workflow
-3. Click **Run workflow**
-4. Enter the tag name (e.g., `v0.1.1`)
-5. Click **Run workflow**
+## Release artifacts
 
-## Workflow Files
+`release.yml` uses `taiki-e/upload-rust-binary-action` with `tar: all`,
+`zip: windows` and `checksum: sha256`, producing per target:
 
-### `.github/workflows/auto-release.yml`
-- **Trigger**: Push to main branch (excluding documentation changes)
-- **Purpose**: Automatic version detection and release creation
-- **Features**:
-  - Version change detection
-  - Multi-platform builds
-  - Automatic tagging
-  - Release creation with artifacts
+- `py2pyd-<target>.tar.gz` — every target
+- `py2pyd-<target>.zip` — Windows targets only
+- `py2pyd-<target>.sha256` — every target
 
-### `.github/workflows/release.yml`
-- **Trigger**: Manual dispatch or tag push
-- **Purpose**: Manual release creation
-- **Features**:
-  - Manual workflow dispatch
-  - Same build matrix as auto-release
-  - Supports re-releasing existing tags
+Static linking is applied only to some targets:
 
-## Build Matrix
+- Windows MSVC jobs set `RUSTFLAGS=-C target-feature=+crt-static` in
+  `release.yml`.
+- `x86_64-unknown-linux-musl` is statically linked by that target's default;
+  `release.yml` sets no `RUSTFLAGS` for it.
+- The `*-linux-gnu` and `*-apple-darwin` targets link dynamically.
 
-The release workflows build for the following targets:
+Not every matrix entry produces a published asset in every release. For example
+`aarch64-unknown-linux-musl` and `x86_64-apple-darwin` are absent from both
+[v0.1.5](https://github.com/loonghao/py2pyd/releases/tag/v0.1.5) and
+[v0.1.6](https://github.com/loonghao/py2pyd/releases/tag/v0.1.6). Check the job
+log for the target in the Actions tab if an expected asset is missing.
 
-| Platform | Target | Output |
-|----------|--------|--------|
-| Windows | `x86_64-pc-windows-msvc` | `py2pyd-windows-x86_64.zip` |
-| Linux | `x86_64-unknown-linux-gnu` | `py2pyd-linux-x86_64.tar.gz` |
-| macOS (Intel) | `x86_64-apple-darwin` | `py2pyd-macos-x86_64.tar.gz` |
-| macOS (ARM) | `aarch64-apple-darwin` | `py2pyd-macos-aarch64.tar.gz` |
+## Secrets
 
-## Release Artifacts
+| Secret | Used by | Purpose |
+|--------|---------|---------|
+| `GITHUB_TOKEN` | all workflows | Default token; `release.yml` needs `contents: write` to attach assets |
+| `CARGO_REGISTRY_TOKEN` | `release-plz.yml` | Publishing to crates.io |
+| `RELEASE_PLZ_TOKEN` | `release-plz.yml` | Optional PAT; falls back to `GITHUB_TOKEN` |
 
-Each release includes:
-- Compiled binary (`py2pyd` or `py2pyd.exe`)
-- `README.md`
-- `LICENSE`
-- Platform-specific archive (`.zip` for Windows, `.tar.gz` for Unix)
+`RELEASE_PLZ_TOKEN` matters for step 4: tags created with the default
+`GITHUB_TOKEN` do not trigger other workflows, so without a PAT `release.yml`
+never runs and the release ships without binaries. `release-plz.yml` already
+uses `${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}`.
 
-## Version Management
+## Manual re-release
 
-- Follow [Semantic Versioning](https://semver.org/)
-- Update version in `Cargo.toml` only
-- The CI system handles Git tagging automatically
-- Release notes are generated from commit messages
+`release.yml` declares only `on: push: tags: ["v*"]` — there is no `workflow_dispatch`, so it cannot be started by hand from the Actions tab. To rebuild binaries for an existing tag, re-run the existing workflow run for that tag, or delete and re-push the tag.
 
 ## Troubleshooting
 
-### Release not triggered
-- Check if version in `Cargo.toml` actually changed
-- Ensure the commit was pushed to `main` branch
-- Check if the path is excluded (documentation changes are ignored)
+**No release after merging the release PR**
+- The version in `Cargo.toml` may already be published on crates.io.
+- The merged commits may contain no bump-triggering type (`docs:`, `chore:` and
+  friends do not bump — see [docs/VERSIONING.md](VERSIONING.md)).
 
-### Build failures
-- Check the Actions tab for detailed error logs
-- Common issues:
-  - Missing dependencies
-  - Compilation errors
-  - Target-specific build issues
+**Nothing happens on push to `main` at all**
+- Both release-plz jobs are gated on
+  `if: github.repository_owner == 'loonghao'`, so forks never release.
 
-### Missing artifacts
-- Verify all build jobs completed successfully
-- Check artifact upload steps in the workflow logs
-- Ensure file paths in the workflow match actual build outputs
+**Tag created, but no binaries attached**
+- Usually `RELEASE_PLZ_TOKEN` is unset, so the `GITHUB_TOKEN`-created tag did
+  not trigger `release.yml`. See [Secrets](#secrets).
 
-## Security
+**release-plz refuses to publish**
+- `semver_check = true` runs `cargo-semver-checks` against the published crate.
+  A breaking API change without a `!` commit still forces a bump; add a
+  `feat!:` prefix or a `BREAKING CHANGE:` footer so the changelog matches.
 
-- The workflows use `GITHUB_TOKEN` for authentication
-- No additional secrets are required
-- All builds run in GitHub's secure environment
-- Artifacts are signed by GitHub's infrastructure
+**Build failures for one target**
+- Open the failing job in the Actions tab. `release.yml` sets
+  `fail-fast: false`, so other targets still publish.

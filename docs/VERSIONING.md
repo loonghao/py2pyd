@@ -1,49 +1,54 @@
-# Versioning and Release Strategies
+# Versioning
 
-This project supports two different release strategies. You can choose the one that best fits your workflow.
+py2pyd has a single release strategy: [release-plz](https://github.com/release-plz/release-plz)
+driven by [Conventional Commits](https://www.conventionalcommits.org/).
 
-## Strategy 1: Manual Version Management (Current)
+- Configuration: [`release-plz.toml`](../release-plz.toml)
+- Workflow: [`.github/workflows/release-plz.yml`](../.github/workflows/release-plz.yml)
+- Binary publishing: [`.github/workflows/release.yml`](../.github/workflows/release.yml),
+  described in [docs/RELEASE.md](RELEASE.md)
 
-**Workflow**: `.github/workflows/auto-release.yml`
+This repository does not use `auto-release.yml` or `semantic-release.yml`, and
+the version in `Cargo.toml` is never edited by hand — release-plz owns it.
 
-### How it works
-1. **Manual version update**: Developer manually updates version in `Cargo.toml`
-2. **Push to main**: When pushed to main branch, CI detects version change
-3. **Automatic release**: If version changed, automatically builds and releases
+## How it works
 
-### Usage
-```bash
-# Update version in Cargo.toml
-sed -i 's/version = "0.1.0"/version = "0.1.1"/' Cargo.toml
+1. Conventional commits are merged into `main`.
+2. The `release-plz-pr` job runs `release-plz release-pr`, which computes the
+   next version, bumps `version` in `Cargo.toml`, regenerates `CHANGELOG.md`,
+   and opens or updates a release PR.
+3. Merging that PR puts the new version on `main`.
+4. The `release-plz-release` job runs `release-plz release`, which publishes to
+   crates.io, creates the `v{{version}}` tag, and creates the GitHub release.
+5. The `v*` tag triggers `release.yml`, which builds and attaches the binaries.
 
-# Commit and push
-git add Cargo.toml
-git commit -m "bump: version 0.1.1"
-git push origin main
-```
+## Version bump rules
 
-### Pros
-- ✅ Full control over versioning
-- ✅ Explicit version decisions
-- ✅ Simple and predictable
-- ✅ Works with any commit message format
+The next version is the higher of two inputs: the bump implied by the merged
+conventional commits, and the bump required by the semver check.
 
-### Cons
-- ❌ Manual version management required
-- ❌ Risk of forgetting to update version
-- ❌ No automatic semantic versioning
+### From conventional commits
 
-## Strategy 2: Semantic Release (Optional)
+| Commit type | Bump at 1.0 and later | Bump at 0.x (current) |
+|-------------|-----------------------|-----------------------|
+| `feat:` | Minor — `1.1.0` → `1.2.0` | Minor — `0.1.6` → `0.2.0` |
+| `fix:` | Patch — `1.1.0` → `1.1.1` | Patch — `0.1.6` → `0.1.7` |
+| Any type with `!`, or a `BREAKING CHANGE:` footer | Major — `1.1.0` → `2.0.0` | Minor — `0.1.6` → `0.2.0` |
+| `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `chore:`, `ci:`, `build:` | No bump | No bump |
 
-**Workflow**: `.github/workflows/semantic-release.yml`
+`Cargo.toml` currently declares `version = "0.1.6"`, so the 0.x column applies:
+breaking changes bump the minor, not the major.
 
-### How it works
-1. **Conventional commits**: Use standardized commit message format
-2. **Automatic version calculation**: CI analyzes commits and determines version bump
-3. **Automatic version update**: CI updates `Cargo.toml` automatically
-4. **Automatic release**: Builds and releases with new version
+### From the semver check
 
-### Conventional Commit Format
+`release-plz.toml` sets `semver_check = true` for the `py2pyd` package, so
+release-plz also runs `cargo-semver-checks` against the version already on
+crates.io. A breaking change in the public API forces a bump even when no commit
+carried `!`. Mark such commits explicitly with `feat!:` or a `BREAKING CHANGE:`
+footer so the changelog reflects the bump.
+
+## Commit message format
+
 ```
 <type>[optional scope]: <description>
 
@@ -52,15 +57,8 @@ git push origin main
 [optional footer(s)]
 ```
 
-### Version Bump Rules
-| Commit Type | Version Bump | Example |
-|-------------|--------------|---------|
-| `feat:` | Minor (0.1.0 → 0.2.0) | `feat: add new compilation feature` |
-| `fix:` | Patch (0.1.0 → 0.1.1) | `fix: resolve memory leak in parser` |
-| `BREAKING CHANGE:` | Major (0.1.0 → 1.0.0) | `feat!: redesign API interface` |
-| `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `chore:` | Patch | `docs: update README` |
+Examples:
 
-### Usage Examples
 ```bash
 # Feature addition (minor bump)
 git commit -m "feat: add support for Python 3.12"
@@ -68,68 +66,17 @@ git commit -m "feat: add support for Python 3.12"
 # Bug fix (patch bump)
 git commit -m "fix: handle edge case in file parsing"
 
-# Breaking change (major bump)
+# Breaking change
 git commit -m "feat!: redesign command-line interface
 
 BREAKING CHANGE: The --input flag is now required"
 
-# Documentation (patch bump)
+# Documentation (no bump)
 git commit -m "docs: add installation instructions"
 ```
 
-### Pros
-- ✅ Automatic version management
-- ✅ Semantic versioning compliance
-- ✅ Clear commit history
-- ✅ No manual version updates needed
-
-### Cons
-- ❌ Requires conventional commit discipline
-- ❌ More complex workflow
-- ❌ Less direct control over versions
-
-## Choosing a Strategy
-
-### Use Manual Version Management if:
-- You prefer explicit control over versions
-- Your team doesn't follow conventional commits
-- You want simple, predictable releases
-- You have infrequent releases
-
-### Use Semantic Release if:
-- Your team follows conventional commits
-- You want automated version management
-- You have frequent releases
-- You want semantic versioning compliance
-
-## Implementation
-
-### Current Setup (Manual)
-The project currently uses manual version management with `auto-release.yml`.
-
-### Switching to Semantic Release
-To switch to semantic release:
-
-1. **Disable current workflow**:
-   ```bash
-   mv .github/workflows/auto-release.yml .github/workflows/auto-release.yml.disabled
-   ```
-
-2. **Enable semantic release**:
-   ```bash
-   # The semantic-release.yml is already created
-   ```
-
-3. **Update team guidelines** to use conventional commits
-
-### Running Both (Not Recommended)
-Running both workflows simultaneously is not recommended as they may conflict. Choose one strategy and stick with it.
-
-## Commit Message Guidelines
-
-If using semantic release, follow these guidelines:
-
 ### Types
+
 - **feat**: A new feature
 - **fix**: A bug fix
 - **docs**: Documentation only changes
@@ -137,42 +84,18 @@ If using semantic release, follow these guidelines:
 - **refactor**: A code change that neither fixes a bug nor adds a feature
 - **perf**: A code change that improves performance
 - **test**: Adding missing tests or correcting existing tests
-- **chore**: Changes to the build process or auxiliary tools
+- **build**: Changes to the build system or dependencies
+- **ci**: Changes to CI configuration
+- **chore**: Other changes that don't modify source or test files
 
-### Examples
-```bash
-# Good conventional commits
-feat(parser): add support for async functions
-fix(compiler): resolve segmentation fault on Windows
-docs(readme): add installation instructions
-refactor(core): simplify error handling logic
-perf(build): optimize compilation speed
-test(parser): add unit tests for edge cases
-chore(deps): update rustpython-parser to 0.4.1
+## Changelog
 
-# Breaking changes
-feat(api)!: redesign command-line interface
-feat(core): remove deprecated functions
+`changelog_update = true` is set at both workspace and package level, so the
+release PR regenerates `CHANGELOG.md`. The header comes from the
+`[changelog] header` value in `release-plz.toml`.
 
-BREAKING CHANGE: The old API has been removed
-```
+## Tag format
 
-## Migration Guide
-
-### From Manual to Semantic
-1. Ensure all team members understand conventional commits
-2. Update contribution guidelines
-3. Switch workflows as described above
-4. Start using conventional commit messages
-
-### From Semantic to Manual
-1. Switch workflows back
-2. Resume manual version management
-3. Update team guidelines
-
-## Best Practices
-
-1. **Be consistent**: Choose one strategy and stick with it
-2. **Document your choice**: Make it clear which strategy you're using
-3. **Train your team**: Ensure everyone understands the chosen workflow
-4. **Monitor releases**: Regularly check that releases are working as expected
+`release-plz.toml` sets `git_tag_name = "v{{version}}"`, and
+`.github/workflows/release.yml` triggers on `push: tags: ["v*"]`. The `v` prefix
+is what connects the two — do not change one without the other.

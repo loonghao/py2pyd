@@ -13,7 +13,7 @@ py2pyd is a Rust-based command-line tool that compiles Python (.py) files to Pyt
 
 ### Key Highlights
 
-- **Zero-Dependency Executables**: Windows and Linux musl release archives are statically linked - download, extract, and run
+- **Zero-Dependency Executables**: Windows MSVC and `x86_64-unknown-linux-musl` release archives are statically linked - download, extract, and run
 - **Universal Compatibility**: Static binaries work on any Windows system or Linux distribution
 - **Flexible Interpreter Discovery**: PATH lookup, `uv` version selection, or an explicit interpreter path
 - **Cython Under the Hood**: Each build runs through a generated `setup.py` in an isolated `uv` environment
@@ -27,7 +27,6 @@ py2pyd is a Rust-based command-line tool that compiles Python (.py) files to Pyt
   - Explicit interpreter path specification (`--python-path`)
 - Batch processing with recursive directory support
 - Optimization level control
-
 - Comprehensive logging and error reporting
 
 ## Installation
@@ -42,13 +41,13 @@ Download the latest release from the [Releases page](https://github.com/loonghao
 
 #### Linux (Static Binaries)
 - **64-bit**: `py2pyd-x86_64-unknown-linux-musl.tar.gz` - Works on any Linux distribution
-- **ARM64**: `py2pyd-aarch64-unknown-linux-musl.tar.gz` - For ARM64 Linux systems
 
 #### macOS
-- **Intel**: `py2pyd-x86_64-apple-darwin.tar.gz`
 - **Apple Silicon**: `py2pyd-aarch64-apple-darwin.tar.gz`
 
-> **Tip**: Windows and Linux musl builds are completely self-contained with zero dependencies. Just download, extract, and run!
+> **Tip**: Windows MSVC and `x86_64-unknown-linux-musl` builds are completely self-contained with zero dependencies. Just download, extract, and run!
+
+Only the archives that actually get published are listed here. `.github/workflows/release.yml` builds eight targets, but `aarch64-unknown-linux-musl` and `x86_64-apple-darwin` have not produced assets in any release so far; see [docs/RELEASE.md](docs/RELEASE.md) for the full matrix.
 
 ### Build from Source
 
@@ -114,7 +113,7 @@ These are accepted before the subcommand.
 | Option | Description |
 |--------|-------------|
 | `-i, --input <INPUT>` | Input Python file (required) |
-| `-o, --output <OUTPUT>` | Output pyd file (default: same as input with .pyd extension) |
+| `-o, --output <OUTPUT>` | Output extension module (default: same as input with `.pyd` extension on Windows, `.so` on Linux/macOS) |
 | `-O, --optimize <OPTIMIZE>` | Optimization level (0-3) (default: 2) |
 
 ### `batch`
@@ -205,7 +204,7 @@ This project uses [release-plz](https://github.com/release-plz/release-plz) with
 
 ### How to Release
 
-Simply use conventional commit messages when pushing to main:
+Use conventional commit messages, then merge the release pull request that release-plz opens:
 
 ```bash
 # Feature addition (minor version bump)
@@ -214,7 +213,7 @@ git commit -m "feat: add support for Python 3.12"
 # Bug fix (patch version bump)
 git commit -m "fix: handle edge case in file parsing"
 
-# Breaking change (major version bump)
+# Breaking change (minor version bump while the version is 0.x)
 git commit -m "feat!: redesign command-line interface
 
 BREAKING CHANGE: The --input flag is now required"
@@ -222,12 +221,12 @@ BREAKING CHANGE: The --input flag is now required"
 
 The CI system will automatically:
 1. **Analyze commit messages** to determine version bump
-2. **Update version** in `Cargo.toml` and the changelog
-3. **Create Git tag** and GitHub release
+2. **Open a release PR** that updates the version in `Cargo.toml` and the changelog
+3. **Publish to crates.io** and create the `v*` tag plus the GitHub release once that PR is merged
 4. **Build binaries** for all supported platforms (`.github/workflows/release.yml`)
 5. **Upload artifacts** with generated release notes
 
-For detailed information, see [docs/VERSIONING.md](docs/VERSIONING.md).
+For detailed information, see [docs/VERSIONING.md](docs/VERSIONING.md) and [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Contributing
 
