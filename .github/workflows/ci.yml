@@ -12,6 +12,10 @@ permissions:
   contents: read
   actions: read
   security-events: write
+  # rustsec/audit-check needs to publish a check run with its findings.
+  # Without this, the Security Audit job fails with "Resource not accessible
+  # by integration" even when no vulnerabilities are found.
+  checks: write
 
 env:
   CARGO_TERM_COLOR: always
