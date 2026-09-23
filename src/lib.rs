@@ -113,8 +113,13 @@ pub fn compile_file(input: &Path, output: &Path, config: &CompileConfig) -> Resu
 ///
 /// # Returns
 ///
-/// Returns `Ok(())` on success. Note that individual file compilation
-/// failures are logged but don't cause the entire batch to fail.
+/// Returns `Ok(())` when no file failed, or when some files compiled and
+/// others did not: individual file compilation failures are logged but don't
+/// cause the entire batch to fail.
+///
+/// Returns an error when *every* file failed to compile, so that a wholly
+/// unsuccessful batch cannot be mistaken for a successful one. An input
+/// pattern that matches no Python file is not an error.
 ///
 /// # Example
 ///
@@ -171,7 +176,8 @@ pub fn compile_file_legacy(input: &Path, output: &Path, optimize_level: u8) -> R
 ///
 /// # Returns
 ///
-/// Returns `Ok(())` on success.
+/// Returns `Ok(())` when no file failed, or when some files compiled and
+/// others did not. Returns an error when every file failed to compile.
 pub fn batch_compile_legacy(
     input_pattern: &str,
     output_dir: &Path,

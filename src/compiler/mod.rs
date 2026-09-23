@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use glob::glob;
 use log::{debug, error, info, warn};
 use std::fs::{self, create_dir_all};
@@ -76,6 +76,11 @@ pub fn batch_compile(
     let python_files = collect_python_files(input_pattern, recursive)
         .with_context(|| format!("Failed to collect Python files from pattern: {input_pattern}"))?;
 
+    if python_files.is_empty() {
+        warn!("No Python files matched '{input_pattern}': nothing to compile");
+        return Ok(());
+    }
+
     info!("Found {} Python files to compile", python_files.len());
 
     // Compile each Python file
@@ -116,11 +121,20 @@ pub fn batch_compile(
 
     info!("Batch compilation complete: {success_count} succeeded, {failure_count} failed");
 
-    if failure_count > 0 {
-        warn!("Some files failed to compile");
+    if failure_count == 0 {
+        return Ok(());
     }
 
-    Ok(())
+    // Single files failing is tolerated on purpose, a batch where nothing
+    // compiled is not: CI has to be able to detect it.
+    if success_count > 0 {
+        warn!("{failure_count} file(s) failed to compile, {success_count} succeeded");
+        return Ok(());
+    }
+
+    Err(anyhow!(
+        "Batch compilation failed: all {failure_count} file(s) failed to compile"
+    ))
 }
 
 /// Collect Python files matching a pattern

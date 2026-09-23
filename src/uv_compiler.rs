@@ -42,6 +42,75 @@ impl Default for CompileConfig {
     }
 }
 
+/// Minimum Python minor version that Cython supports for the Limited API.
+///
+/// Cython emits `#error "Cython <version> requires the Python Limited API
+/// version to be 3.9 or greater."` into the generated C source when
+/// `Py_LIMITED_API` is set below this version, which surfaces as
+/// `fatal error C1189` on MSVC. py2pyd rejects the target up front instead of
+/// letting the C compiler fail with an opaque message.
+pub const MIN_LIMITED_API_MINOR: u32 = 9;
+
+/// Build the `Py_LIMITED_API` macro value for a Python `major.minor` version.
+///
+/// # Errors
+///
+/// Returns an error when the target predates the Limited API support that
+/// Cython requires, or when it is not a Python 3.x version.
+pub fn limited_api_macro(major: u32, minor: u32) -> Result<String> {
+    if major != 3 {
+        return Err(anyhow!(
+            "Unsupported Python version {major}.{minor}: py2pyd can only build Limited API extensions for Python 3"
+        ));
+    }
+
+    if minor < MIN_LIMITED_API_MINOR {
+        return Err(anyhow!(
+            "Python 3.{minor} is too old for a Limited API build: Cython requires Python 3.{MIN_LIMITED_API_MINOR} or newer. \
+             Select a newer interpreter with --python-version or --python-path"
+        ));
+    }
+
+    Ok(format!("0x{major:02X}{minor:02X}0000"))
+}
+
+/// Parse a `major.minor` Python version string such as `3.12`.
+pub fn parse_python_version(version: &str) -> Result<(u32, u32)> {
+    let trimmed = version.trim();
+    let mut parts = trimmed.split('.');
+    let major = parts.next().unwrap_or_default();
+    let minor = parts.next().unwrap_or_default();
+
+    let parse_part = |part: &str, label: &str| -> Result<u32> {
+        part.parse::<u32>()
+            .with_context(|| format!("Invalid {label} in Python version '{trimmed}'"))
+    };
+
+    Ok((
+        parse_part(major, "major version")?,
+        parse_part(minor, "minor version")?,
+    ))
+}
+
+/// Ask a Python interpreter for its `major.minor` version.
+pub fn detect_python_version(python: &Path) -> Result<(u32, u32)> {
+    let output = Command::new(python)
+        .arg("-c")
+        .arg("import sys; print('%d.%d' % sys.version_info[:2])")
+        .output()
+        .with_context(|| format!("Failed to query the Python version of {}", python.display()))?;
+
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Python interpreter {} failed to report its version: {}",
+            python.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    parse_python_version(&String::from_utf8_lossy(&output.stdout))
+}
+
 /// Compile a Python file to a pyd file using uv
 pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfig) -> Result<()> {
     info!(
@@ -75,11 +144,17 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     let source_code = fs::read_to_string(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
 
-    // Create the setup.py file
-    let setup_py_path = temp_dir_path.join("setup.py");
-    let setup_py_content = generate_setup_py(module_name, &source_code, config);
-    fs::write(&setup_py_path, setup_py_content)
-        .with_context(|| format!("Failed to write setup.py to {}", setup_py_path.display()))?;
+    // Resolve the Limited API target from an explicitly requested Python
+    // version before spending time on the uv environment. Without an explicit
+    // version the target is only known once uv picked an interpreter.
+    let requested_limited_api = match &config.python_version {
+        Some(requested) => {
+            let (major, minor) = parse_python_version(requested)
+                .with_context(|| format!("Invalid --python-version: {requested}"))?;
+            Some(limited_api_macro(major, minor)?)
+        }
+        None => None,
+    };
 
     // Copy the Python source file to the temp directory
     let source_path = temp_dir_path.join(format!("{module_name}.py"));
@@ -111,6 +186,28 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
         uv_env.venv_path.display()
     );
     info!("Using Python interpreter: {}", uv_env.python_path.display());
+
+    // `Py_LIMITED_API` has to match the interpreter we build with. A mismatch
+    // makes Cython abort the build with `fatal error C1189`.
+    let limited_api = match requested_limited_api {
+        Some(value) => value,
+        None => {
+            let (major, minor) = detect_python_version(&uv_env.python_path).with_context(|| {
+                format!(
+                    "Failed to determine the Python version of {}",
+                    uv_env.python_path.display()
+                )
+            })?;
+            limited_api_macro(major, minor)?
+        }
+    };
+    info!("Building with Py_LIMITED_API={limited_api}");
+
+    // Create the setup.py file
+    let setup_py_path = temp_dir_path.join("setup.py");
+    let setup_py_content = generate_setup_py(module_name, &limited_api);
+    fs::write(&setup_py_path, setup_py_content)
+        .with_context(|| format!("Failed to write setup.py to {}", setup_py_path.display()))?;
 
     // Build the extension module
     info!("Building extension module...");
@@ -194,6 +291,11 @@ pub fn batch_compile(
     let python_files = collect_python_files(input_pattern, recursive)
         .with_context(|| format!("Failed to collect Python files from pattern: {input_pattern}"))?;
 
+    if python_files.is_empty() {
+        warn!("No Python files matched '{input_pattern}': nothing to compile");
+        return Ok(());
+    }
+
     info!("Found {} Python files to compile", python_files.len());
 
     // Compile each Python file
@@ -232,13 +334,29 @@ pub fn batch_compile(
         }
     }
 
+    batch_outcome(success_count, failure_count)
+}
+
+/// Turn batch counters into a result.
+///
+/// Individual file failures are tolerated on purpose so that one broken file
+/// does not discard the rest of the batch. A batch in which nothing compiled
+/// is a failure, otherwise CI cannot tell it apart from a successful run.
+fn batch_outcome(success_count: usize, failure_count: usize) -> Result<()> {
     info!("Batch compilation complete: {success_count} succeeded, {failure_count} failed");
 
-    if failure_count > 0 {
-        warn!("Some files failed to compile");
+    if failure_count == 0 {
+        return Ok(());
     }
 
-    Ok(())
+    if success_count > 0 {
+        warn!("{failure_count} file(s) failed to compile, {success_count} succeeded");
+        return Ok(());
+    }
+
+    Err(anyhow!(
+        "Batch compilation failed: all {failure_count} file(s) failed to compile"
+    ))
 }
 
 /// Collect Python files matching a pattern
@@ -291,11 +409,10 @@ fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> 
 }
 
 /// Generate a setup.py file for building the extension module
-fn generate_setup_py(
-    module_name: &str,
-    _source_code: &str,      // Unused but kept for potential future use
-    _config: &CompileConfig, // Unused but kept for potential future use
-) -> String {
+///
+/// `limited_api` is the `Py_LIMITED_API` macro value matching the interpreter
+/// the extension is built against.
+fn generate_setup_py(module_name: &str, limited_api: &str) -> String {
     let mut setup_py = String::new();
 
     setup_py.push_str("from setuptools import setup, Extension\n");
@@ -319,9 +436,13 @@ fn generate_setup_py(
     // Add custom include paths if needed in the future
     // Currently not used
 
-    // Enable ABI3 compatibility
+    // Enable ABI3 compatibility against the resolved target version
     setup_py.push_str("        py_limited_api=True,\n");
-    setup_py.push_str("        define_macros=[('Py_LIMITED_API', '0x03070000')],\n");
+    writeln!(
+        setup_py,
+        "        define_macros=[('Py_LIMITED_API', '{limited_api}')],"
+    )
+    .unwrap();
     setup_py.push_str("    )],\n");
 
     // Use custom build_ext class
@@ -330,4 +451,114 @@ fn generate_setup_py(
     setup_py.push_str(")\n");
 
     setup_py
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_limited_api_macro_matches_target_version() {
+        assert_eq!(limited_api_macro(3, 9).unwrap(), "0x03090000");
+        assert_eq!(limited_api_macro(3, 10).unwrap(), "0x030A0000");
+        assert_eq!(limited_api_macro(3, 12).unwrap(), "0x030C0000");
+        assert_eq!(limited_api_macro(3, 13).unwrap(), "0x030D0000");
+    }
+
+    /// The hardcoded `0x03070000` made every build fail with Cython 3.x.
+    #[test]
+    fn test_limited_api_macro_rejects_versions_below_cython_minimum() {
+        for minor in [0, 7, 8] {
+            let err = limited_api_macro(3, minor).unwrap_err().to_string();
+            assert!(
+                err.contains("too old for a Limited API build"),
+                "unexpected error for 3.{minor}: {err}"
+            );
+            assert!(
+                err.contains("3.9 or newer"),
+                "error should name the minimum: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_limited_api_macro_rejects_python_2() {
+        let err = limited_api_macro(2, 7).unwrap_err().to_string();
+        assert!(err.contains("Unsupported Python version 2.7"), "{err}");
+    }
+
+    #[test]
+    fn test_parse_python_version() {
+        assert_eq!(parse_python_version("3.12").unwrap(), (3, 12));
+        assert_eq!(parse_python_version("3.9").unwrap(), (3, 9));
+        assert_eq!(parse_python_version(" 3.10 ").unwrap(), (3, 10));
+        assert!(parse_python_version("3").is_err());
+        assert!(parse_python_version("3.x").is_err());
+        assert!(parse_python_version("").is_err());
+    }
+
+    #[test]
+    fn test_generate_setup_py_uses_resolved_limited_api() {
+        let setup_py = generate_setup_py("demo", "0x030C0000");
+        assert!(
+            setup_py.contains("('Py_LIMITED_API', '0x030C0000')"),
+            "{setup_py}"
+        );
+        assert!(!setup_py.contains("0x03070000"), "{setup_py}");
+        assert!(setup_py.contains("py_limited_api=True"), "{setup_py}");
+        assert!(setup_py.contains("sources=['demo.py']"), "{setup_py}");
+    }
+
+    #[test]
+    fn test_batch_outcome_all_succeeded() {
+        assert!(batch_outcome(3, 0).is_ok());
+    }
+
+    #[test]
+    fn test_batch_outcome_partial_failure_is_tolerated() {
+        assert!(batch_outcome(2, 1).is_ok());
+    }
+
+    /// Every file failing has to surface as an error so CI notices.
+    #[test]
+    fn test_batch_outcome_total_failure_is_an_error() {
+        let err = batch_outcome(0, 2).unwrap_err().to_string();
+        assert!(err.contains("all 2 file(s) failed to compile"), "{err}");
+    }
+
+    #[test]
+    fn test_batch_compile_reports_failure_when_every_file_fails() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let input_dir = temp_dir.path().join("in");
+        let output_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&input_dir).unwrap();
+
+        for name in ["broken_a.py", "broken_b.py"] {
+            fs::write(input_dir.join(name), "def broken(:\n    not python\n").unwrap();
+        }
+
+        // A target below the Cython minimum is rejected before uv or a C
+        // compiler is involved, so this stays a fast, hermetic test.
+        let config = CompileConfig {
+            python_version: Some("3.7".to_string()),
+            ..Default::default()
+        };
+
+        let err = batch_compile(input_dir.to_str().unwrap(), &output_dir, &config, false)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("all 2 file(s) failed to compile"), "{err}");
+    }
+
+    #[test]
+    fn test_batch_compile_no_matching_files_is_not_an_error() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let input_dir = temp_dir.path().join("empty");
+        let output_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&input_dir).unwrap();
+
+        let config = CompileConfig::default();
+        assert!(batch_compile(input_dir.to_str().unwrap(), &output_dir, &config, false).is_ok());
+    }
 }
