@@ -9,6 +9,16 @@
 //! `main` refuses to run at all when no C toolchain is present, so the CLI
 //! tests below skip on machines without one. The library-level test always
 //! runs and guards the shared outcome decision itself.
+//!
+//! One case cannot be hermetic: constructing a *partially* successful batch
+//! needs a module that genuinely compiles, which means a real Cython build
+//! through `uv`. `uv` is missing on the windows-latest runner and
+//! `uv_env::install_uv` does not put it on PATH for the running process, so
+//! that one test is ignored on Windows only. The contract is still covered
+//! there by the other cases: the two CLI tests pin both halves of the exit
+//! code mapping (`Err` => non-zero, `Ok` => zero) and
+//! `batch_outcome_decides_the_exit_code` pins every branch of the decision,
+//! including partial success.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -81,11 +91,20 @@ fn batch_exits_non_zero_when_every_file_fails() {
         !output.status.success(),
         "a batch where every file failed must exit non-zero"
     );
+
+    // The per-file failures have to be reported too, not just swallowed into
+    // a summary: that warning is how a user finds out which file broke.
     let stderr = stderr_of(&output);
     assert!(
         stderr.contains("all 2 file(s) failed to compile"),
         "stderr should report the total batch failure, got:\n{stderr}"
     );
+    for name in ["broken_a.py", "broken_b.py"] {
+        assert!(
+            stderr.contains(name),
+            "{name} should be reported by name, got:\n{stderr}"
+        );
+    }
 }
 
 /// One broken file must not discard the rest of the batch: the run still
@@ -97,6 +116,18 @@ fn batch_exits_non_zero_when_every_file_fails() {
 /// reason (uv download, compiler hiccup) still leaves a partial batch to
 /// assert on. The contract under test is the exit code, the warning and the
 /// surviving artifacts, not the exact failure count.
+///
+/// Windows carries an explicit ignore rather than a runtime skip: `uv` is not
+/// on the windows-latest image, and `uv_env::install_uv` installs it outside
+/// the PATH of the running process, so every module fails there and a partial
+/// batch cannot be constructed at all. Leaving it un-ignored would make this
+/// test fail for an environmental reason on every Windows run while proving
+/// nothing about the contract. The other cases in this file keep the contract
+/// covered on Windows; see the module docs.
+#[cfg_attr(
+    target_os = "windows",
+    ignore = "needs a working uv toolchain; uv is absent from the windows image"
+)]
 #[test]
 fn batch_exits_zero_and_warns_when_only_some_files_fail() {
     if !build_toolchain_available() {
@@ -172,6 +203,25 @@ fn batch_exits_zero_when_no_python_file_matches() {
         "an empty batch is not a failure, stderr:\n{}",
         stderr_of(&output)
     );
+}
+
+/// Pin every branch of the decision that both backends share, so the mapping
+/// from counters to exit code is asserted on every platform -- including
+/// Windows, where the partial-success case above cannot build a real module.
+///
+/// `main` turns `Err` into a non-zero exit code and `Ok` into zero, so these
+/// four rows are the whole contract.
+#[test]
+fn batch_outcome_decides_the_exit_code() {
+    // Nothing failed: success.
+    assert!(py2pyd::batch_outcome(3, 0).is_ok());
+    // Nothing was attempted: success, not a failure.
+    assert!(py2pyd::batch_outcome(0, 0).is_ok());
+    // Partial failure: tolerated, the batch still counts as successful.
+    assert!(py2pyd::batch_outcome(2, 1).is_ok());
+    // Total failure: an error, so the process exits non-zero.
+    let err = py2pyd::batch_outcome(0, 2).expect_err("a fully failed batch must fail");
+    assert!(err.to_string().contains("all 2 file(s) failed to compile"));
 }
 
 /// The legacy (non-uv) backend shares the same outcome contract as the
