@@ -140,9 +140,33 @@ the batch as a whole:
 
 ### Limited API and target Python version
 
-Every build targets the Python Limited API (`Py_LIMITED_API`) matching the
-interpreter it builds with, so an extension compiled for Python 3.9 also loads
-on later Python 3.x releases.
+Every build targets the Python Limited API (`Py_LIMITED_API`). The macro is
+pinned to the interpreter the extension is built with, so the resulting module
+loads on that interpreter and on later Python 3.x releases, but not on older
+ones.
+
+Cross-version portability therefore has to be requested explicitly: pass
+`--python-version` with the oldest release you need to support.
+
+```bash
+# Loads on Python 3.9 and later
+py2pyd --python-version 3.9 compile -i input.py -o output.pyd
+```
+
+Without `--python-version` the target is whatever interpreter `uv` builds with,
+so the module only loads on that release or newer. For example, when `uv`
+resolves Python 3.14, the build uses `Py_LIMITED_API=0x030E0000` and the result
+cannot be imported by Python 3.12.
+
+The target is resolved in this order:
+
+1. `--python-version`, when given.
+2. The interpreter behind `--python-path`, when given.
+3. Otherwise the interpreter that `uv` resolves on its own.
+
+In cases 2 and 3 the version is measured from the interpreter inside the
+generated virtual environment, so `--python-version` is the only way to pin the
+floor independently of the toolchain `uv` picks.
 
 The minimum supported target is **Python 3.9**, because Cython does not build
 Limited API extensions below that version. Selecting an older interpreter fails
@@ -152,9 +176,6 @@ before compilation starts with an explicit error instead of a compiler error:
 Python 3.7 is too old for a Limited API build: Cython requires Python 3.9 or newer.
 Select a newer interpreter with --python-version or --python-path
 ```
-
-The target is taken from `--python-version` when given, otherwise from
-`--python-path`, otherwise from the interpreter that `uv` resolves.
 
 ## Requirements
 
