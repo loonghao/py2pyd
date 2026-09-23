@@ -347,25 +347,25 @@ def reverse(s):
         );
 
         let output = batch_compile_with_cli(&input_dir, &output_dir, false)?;
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
 
-        if output.status.success() {
-            println!("✅ Batch compilation successful!");
+        assert!(
+            output.status.success(),
+            "batch compilation of valid modules should succeed, stderr:\n{stderr}"
+        );
+        assert!(output_dir.exists(), "output directory should exist");
 
-            // Check that output directory was created
-            assert!(output_dir.exists(), "Output directory should exist");
-
-            // List compiled files
-            if output_dir.exists() {
-                for entry in fs::read_dir(&output_dir)? {
-                    let entry = entry?;
-                    println!("  Compiled: {}", entry.path().display());
-                }
-            }
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            println!("Batch compilation output:\nstdout: {stdout}\nstderr: {stderr}");
+        let extension = if cfg!(windows) { "pyd" } else { "so" };
+        for name in ["utils", "math_utils", "string_utils"] {
+            let compiled = output_dir.join(format!("{name}.{extension}"));
+            assert!(
+                compiled.exists(),
+                "expected {name} to compile to {}, stderr:\n{stderr}",
+                compiled.display()
+            );
         }
+
+        println!("✅ Batch compilation produced {} modules", files.len());
 
         Ok(())
     }
@@ -748,14 +748,23 @@ def compute(x):
         let result =
             py2pyd::batch_compile(input_dir.to_str().unwrap(), &output_dir, &config, false);
 
-        match result {
-            Ok(()) => {
-                println!("✅ Library batch compile successful!");
-            }
-            Err(e) => {
-                println!("Library batch compile failed (may be expected): {e}");
-            }
+        assert!(
+            result.is_ok(),
+            "library batch compile should succeed for valid modules: {:?}",
+            result.err()
+        );
+
+        let extension = if cfg!(windows) { "pyd" } else { "so" };
+        for name in ["a", "b"] {
+            let compiled = output_dir.join(format!("{name}.{extension}"));
+            assert!(
+                compiled.exists(),
+                "expected {name} to compile to {}",
+                compiled.display()
+            );
         }
+
+        println!("✅ Library batch compile produced both modules");
 
         Ok(())
     }

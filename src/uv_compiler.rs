@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
-use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
+use crate::batch_outcome::batch_outcome;
 use crate::uv_env::{UvEnv, UvEnvConfig};
 
 /// Configuration for compiling a Python module to a pyd file
@@ -337,28 +337,6 @@ pub fn batch_compile(
     batch_outcome(success_count, failure_count)
 }
 
-/// Turn batch counters into a result.
-///
-/// Individual file failures are tolerated on purpose so that one broken file
-/// does not discard the rest of the batch. A batch in which nothing compiled
-/// is a failure, otherwise CI cannot tell it apart from a successful run.
-fn batch_outcome(success_count: usize, failure_count: usize) -> Result<()> {
-    info!("Batch compilation complete: {success_count} succeeded, {failure_count} failed");
-
-    if failure_count == 0 {
-        return Ok(());
-    }
-
-    if success_count > 0 {
-        warn!("{failure_count} file(s) failed to compile, {success_count} succeeded");
-        return Ok(());
-    }
-
-    Err(anyhow!(
-        "Batch compilation failed: all {failure_count} file(s) failed to compile"
-    ))
-}
-
 /// Collect Python files matching a pattern
 fn collect_python_files(pattern: &str, recursive: bool) -> Result<Vec<PathBuf>> {
     let mut python_files = Vec::new();
@@ -427,22 +405,20 @@ fn generate_setup_py(module_name: &str, limited_api: &str) -> String {
 
     // Setup the extension module
     setup_py.push_str("setup(\n");
-    writeln!(setup_py, "    name='{module_name}',").unwrap();
+    setup_py.push_str(&format!("    name='{module_name}',\n"));
     setup_py.push_str("    version='0.1',\n");
     setup_py.push_str("    ext_modules=[Extension(\n");
-    writeln!(setup_py, "        '{module_name}',").unwrap();
-    writeln!(setup_py, "        sources=['{module_name}.py'],").unwrap();
+    setup_py.push_str(&format!("        '{module_name}',\n"));
+    setup_py.push_str(&format!("        sources=['{module_name}.py'],\n"));
 
     // Add custom include paths if needed in the future
     // Currently not used
 
     // Enable ABI3 compatibility against the resolved target version
     setup_py.push_str("        py_limited_api=True,\n");
-    writeln!(
-        setup_py,
-        "        define_macros=[('Py_LIMITED_API', '{limited_api}')],"
-    )
-    .unwrap();
+    setup_py.push_str(&format!(
+        "        define_macros=[('Py_LIMITED_API', '{limited_api}')],\n"
+    ));
     setup_py.push_str("    )],\n");
 
     // Use custom build_ext class
@@ -456,6 +432,18 @@ fn generate_setup_py(module_name: &str, limited_api: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Locate an interpreter for the tests that shell out to Python.
+    ///
+    /// `python3` is tried before `python` because Windows ships a Store alias
+    /// named `python3` that exits without running the script; falling through
+    /// to `python` keeps the search working there too.
+    fn find_interpreter() -> Option<PathBuf> {
+        ["python3", "python"]
+            .iter()
+            .find_map(|name| which::which(name).ok())
+            .filter(|path| detect_python_version(path).is_ok())
+    }
 
     #[test]
     fn test_limited_api_macro_matches_target_version() {
@@ -497,6 +485,42 @@ mod tests {
         assert!(parse_python_version("").is_err());
     }
 
+    /// `detect_python_version` is the default path when neither
+    /// `--python-version` nor `--python-path` is given, so a broken detector
+    /// silently produces a `Py_LIMITED_API` value for the wrong interpreter.
+    #[test]
+    fn test_detect_python_version_reports_the_interpreter_version() {
+        let Some(python) = find_interpreter() else {
+            eprintln!("skipping: no python3/python on PATH");
+            return;
+        };
+
+        let (major, minor) =
+            detect_python_version(&python).expect("the interpreter should report its version");
+
+        assert_eq!(major, 3, "{} reported {major}.{minor}", python.display());
+        assert!(
+            minor >= MIN_LIMITED_API_MINOR,
+            "py2pyd cannot build against 3.{minor}; the Limited API floor is 3.{MIN_LIMITED_API_MINOR}"
+        );
+        assert!(
+            limited_api_macro(major, minor).is_ok(),
+            "a detected interpreter must produce a usable Py_LIMITED_API value"
+        );
+    }
+
+    #[test]
+    fn test_detect_python_version_reports_a_missing_interpreter() {
+        let missing = std::env::temp_dir().join("py2pyd-no-such-interpreter");
+
+        let err = detect_python_version(&missing).unwrap_err().to_string();
+
+        assert!(
+            err.contains("Failed to query the Python version of"),
+            "{err}"
+        );
+    }
+
     #[test]
     fn test_generate_setup_py_uses_resolved_limited_api() {
         let setup_py = generate_setup_py("demo", "0x030C0000");
@@ -507,23 +531,6 @@ mod tests {
         assert!(!setup_py.contains("0x03070000"), "{setup_py}");
         assert!(setup_py.contains("py_limited_api=True"), "{setup_py}");
         assert!(setup_py.contains("sources=['demo.py']"), "{setup_py}");
-    }
-
-    #[test]
-    fn test_batch_outcome_all_succeeded() {
-        assert!(batch_outcome(3, 0).is_ok());
-    }
-
-    #[test]
-    fn test_batch_outcome_partial_failure_is_tolerated() {
-        assert!(batch_outcome(2, 1).is_ok());
-    }
-
-    /// Every file failing has to surface as an error so CI notices.
-    #[test]
-    fn test_batch_outcome_total_failure_is_an_error() {
-        let err = batch_outcome(0, 2).unwrap_err().to_string();
-        assert!(err.contains("all 2 file(s) failed to compile"), "{err}");
     }
 
     #[test]

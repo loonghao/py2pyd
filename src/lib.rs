@@ -45,6 +45,7 @@ use anyhow::Result;
 use std::path::Path;
 
 // Re-export modules for library usage
+pub mod batch_outcome;
 pub mod build_tools;
 pub mod compiler;
 pub mod parser;
@@ -55,6 +56,7 @@ pub mod uv_compiler;
 pub mod uv_env;
 
 // Re-export commonly used types
+pub use batch_outcome::batch_outcome;
 pub use build_tools::{check_build_tools, detect_build_tools, BuildTools};
 pub use compiler::{
     batch_compile as compiler_batch_compile, compile_file as compiler_compile_file,

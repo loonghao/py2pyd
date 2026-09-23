@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
 
+use crate::batch_outcome::batch_outcome;
 use crate::transformer::TransformedModule;
 
 /// Compile a single Python file to a pyd file
@@ -119,22 +120,9 @@ pub fn batch_compile(
         }
     }
 
-    info!("Batch compilation complete: {success_count} succeeded, {failure_count} failed");
-
-    if failure_count == 0 {
-        return Ok(());
-    }
-
-    // Single files failing is tolerated on purpose, a batch where nothing
-    // compiled is not: CI has to be able to detect it.
-    if success_count > 0 {
-        warn!("{failure_count} file(s) failed to compile, {success_count} succeeded");
-        return Ok(());
-    }
-
-    Err(anyhow!(
-        "Batch compilation failed: all {failure_count} file(s) failed to compile"
-    ))
+    // Shares the outcome contract with the uv-backed compiler so that the two
+    // backends cannot report different exit codes for the same batch.
+    batch_outcome(success_count, failure_count)
 }
 
 /// Collect Python files matching a pattern
@@ -247,10 +235,7 @@ features = ["pyo3/extension-module"]
         .with_context(|| "Failed to execute cargo build")?;
 
     if !status.success() {
-        return Err(anyhow::anyhow!(
-            "Cargo build failed with status: {}",
-            status
-        ));
+        return Err(anyhow!("Cargo build failed with status: {status}"));
     }
 
     debug!("Built Rust project successfully with cargo");
@@ -357,4 +342,42 @@ fn copy_compiled_library(transformed: &TransformedModule, output_path: &Path) ->
 
     debug!("Copied compiled library to {}", output_path.display());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The legacy backend has to fail a fully failed batch exactly like the
+    /// uv-backed one does; the shared [`crate::batch_outcome`] is what keeps
+    /// the two from drifting apart.
+    #[test]
+    fn test_batch_compile_fails_when_every_file_fails() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let input_dir = temp_dir.path().join("in");
+        let output_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&input_dir).unwrap();
+
+        for name in ["broken_a.py", "broken_b.py"] {
+            fs::write(input_dir.join(name), "def broken(:\n    not python\n").unwrap();
+        }
+
+        // Parsing happens before any compiler is invoked, so this stays
+        // hermetic: no uv, no C toolchain, no network.
+        let err = batch_compile(input_dir.to_str().unwrap(), &output_dir, "", 2, false)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("all 2 file(s) failed to compile"), "{err}");
+    }
+
+    #[test]
+    fn test_batch_compile_with_no_matching_files_is_not_an_error() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let input_dir = temp_dir.path().join("empty");
+        let output_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&input_dir).unwrap();
+
+        assert!(batch_compile(input_dir.to_str().unwrap(), &output_dir, "", 2, false).is_ok());
+    }
 }
