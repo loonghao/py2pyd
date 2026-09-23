@@ -125,6 +125,37 @@ These are accepted before the subcommand.
 | `-O, --optimize <OPTIMIZE>` | Optimization level (0-3) (default: 2) |
 | `-r, --recursive` | Recursive search |
 
+#### Exit behavior
+
+`batch` tolerates individual failures: a file that cannot be compiled is logged
+at `warn` level and the remaining files are still built. The exit code reflects
+the batch as a whole:
+
+| Result | Exit code |
+|--------|-----------|
+| Every file compiled | `0` |
+| Some files compiled, some failed | `0` (the counts are logged) |
+| Every file failed | non-zero |
+| No Python file matched the input pattern | `0` (logged at `warn`) |
+
+### Limited API and target Python version
+
+Every build targets the Python Limited API (`Py_LIMITED_API`) matching the
+interpreter it builds with, so an extension compiled for Python 3.9 also loads
+on later Python 3.x releases.
+
+The minimum supported target is **Python 3.9**, because Cython does not build
+Limited API extensions below that version. Selecting an older interpreter fails
+before compilation starts with an explicit error instead of a compiler error:
+
+```text
+Python 3.7 is too old for a Limited API build: Cython requires Python 3.9 or newer.
+Select a newer interpreter with --python-version or --python-path
+```
+
+The target is taken from `--python-version` when given, otherwise from
+`--python-path`, otherwise from the interpreter that `uv` resolves.
+
 ## Requirements
 
 - Operating system:

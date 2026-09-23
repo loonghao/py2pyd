@@ -269,7 +269,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            info!("Successfully batch compiled");
+            info!("Batch compilation finished");
         }
     }
 

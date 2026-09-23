@@ -66,11 +66,16 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     let source_code = fs::read_to_string(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
 
-    // Create the setup.py file
-    let setup_py_path = temp_dir_path.join("setup.py");
-    let setup_py_content = generate_setup_py(module_name, &source_code, config)?;
-    fs::write(&setup_py_path, setup_py_content)
-        .with_context(|| format!("Failed to write setup.py to {}", setup_py_path.display()))?;
+    // Resolve the Limited API target from an explicitly requested Python
+    // version before doing any expensive work.
+    let requested_limited_api = match &config.python_version {
+        Some(requested) => {
+            let (major, minor) = crate::uv_compiler::parse_python_version(requested)
+                .with_context(|| format!("Invalid --python-version: {requested}"))?;
+            Some(crate::uv_compiler::limited_api_macro(major, minor)?)
+        }
+        None => None,
+    };
 
     // Copy the Python source file to the temp directory
     let source_path = temp_dir_path.join(format!("{}.py", module_name));
@@ -80,6 +85,29 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     // Find the Python interpreter
     let python_path = find_python_interpreter(config)?;
     debug!("Using Python interpreter: {}", python_path.display());
+
+    // `Py_LIMITED_API` has to match the interpreter we build with. A mismatch
+    // makes Cython abort the build with `fatal error C1189`.
+    let limited_api = match requested_limited_api {
+        Some(value) => value,
+        None => {
+            let (major, minor) = crate::uv_compiler::detect_python_version(&python_path)
+                .with_context(|| {
+                    format!(
+                        "Failed to determine the Python version of {}",
+                        python_path.display()
+                    )
+                })?;
+            crate::uv_compiler::limited_api_macro(major, minor)?
+        }
+    };
+    info!("Building with Py_LIMITED_API={limited_api}");
+
+    // Create the setup.py file
+    let setup_py_path = temp_dir_path.join("setup.py");
+    let setup_py_content = generate_setup_py(module_name, &limited_api)?;
+    fs::write(&setup_py_path, setup_py_content)
+        .with_context(|| format!("Failed to write setup.py to {}", setup_py_path.display()))?;
 
     // Build the extension module
     info!("Building extension module...");
@@ -335,7 +363,10 @@ fn find_python_interpreter(config: &CompileConfig) -> Result<PathBuf> {
 }
 
 /// Generate a setup.py file for building the extension module
-fn generate_setup_py(module_name: &str, source_code: &str, config: &CompileConfig) -> Result<String> {
+///
+/// `limited_api` is the `Py_LIMITED_API` macro value matching the interpreter
+/// the extension is built against.
+fn generate_setup_py(module_name: &str, limited_api: &str) -> Result<String> {
     let mut setup_py = String::new();
 
     setup_py.push_str("from setuptools import setup, Extension\n");
@@ -359,9 +390,12 @@ fn generate_setup_py(module_name: &str, source_code: &str, config: &CompileConfi
     // Add custom include paths if needed in the future
     // Currently not used
 
-    // Enable ABI3 compatibility
+    // Enable ABI3 compatibility against the resolved target version
     setup_py.push_str("        py_limited_api=True,\n");
-    setup_py.push_str("        define_macros=[('Py_LIMITED_API', '0x03070000')],\n");
+    setup_py.push_str(&format!(
+        "        define_macros=[('Py_LIMITED_API', '{}')],\n",
+        limited_api
+    ));
     setup_py.push_str("    )],\n");
 
     // Use custom build_ext class
