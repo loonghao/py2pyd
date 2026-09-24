@@ -65,9 +65,8 @@ const CYTHON_LIMITED_API_FLOORS: &[((u32, u32), u32)] = &[((3, 3), MIN_LIMITED_A
 /// Oldest `Py_LIMITED_API` minor version the given Cython release supports.
 ///
 /// Falls back to [`MIN_LIMITED_API_MINOR`] when `cython_version` is `None` or
-/// is not a `major.minor[.patch]` release that appears in
-/// [`CYTHON_LIMITED_API_FLOORS`]: a missing version must never fail a build
-/// that would otherwise work.
+/// is not a `major.minor[.patch]` release covered by the known Cython floors:
+/// a missing version must never fail a build that would otherwise work.
 pub fn cython_limited_api_minor(cython_version: Option<&str>) -> u32 {
     let Some((major, minor)) = cython_version.and_then(parse_cython_release) else {
         return MIN_LIMITED_API_MINOR;
