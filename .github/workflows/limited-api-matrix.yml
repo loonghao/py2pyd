@@ -40,9 +40,6 @@ jobs:
   verify:
     name: ${{ matrix.os }} - floor ${{ matrix.floor }}
     runs-on: ${{ matrix.os }}
-    env:
-      # Scratch space for step logs; runner.temp exists on every runner image.
-      LOGS: ${{ runner.temp }}
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +76,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          LOGS="${RUNNER_TEMP:-/tmp}"
           floor="${{ matrix.floor }}"
           echo "### Fetching CPython ${floor}" >> "$GITHUB_STEP_SUMMARY"
           if uv python install "${floor}" 2>&1 | tee "${LOGS}/probe.log"; then
@@ -100,6 +98,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          LOGS="${RUNNER_TEMP:-/tmp}"
           floor="${{ matrix.floor }}"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Offline behaviour (CPython ${floor})" >> "$GITHUB_STEP_SUMMARY"
@@ -132,6 +131,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          LOGS="${RUNNER_TEMP:-/tmp}"
           floor="${{ matrix.floor }}"
           mkdir -p build/matrix
 
