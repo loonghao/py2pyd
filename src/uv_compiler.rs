@@ -49,7 +49,38 @@ impl Default for CompileConfig {
 /// `Py_LIMITED_API` is set below this version, which surfaces as
 /// `fatal error C1189` on MSVC. py2pyd rejects the target up front instead of
 /// letting the C compiler fail with an opaque message.
+///
+/// This is the floor py2pyd assumes when the installed Cython version cannot
+/// be determined. See [`cython_limited_api_minor`] for the version-aware floor.
 pub const MIN_LIMITED_API_MINOR: u32 = 9;
+
+/// `Py_LIMITED_API` floors introduced by Cython releases, newest last.
+///
+/// Cython writes its floor into every generated C file, so a Cython upgrade
+/// can raise the oldest target py2pyd is able to build. Keeping the measured
+/// floors here lets the error name the real requirement instead of blaming the
+/// interpreter for a Cython upgrade.
+const CYTHON_LIMITED_API_FLOORS: &[((u32, u32), u32)] = &[((3, 3), MIN_LIMITED_API_MINOR)];
+
+/// Oldest `Py_LIMITED_API` minor version the given Cython release supports.
+///
+/// Falls back to [`MIN_LIMITED_API_MINOR`] when `cython_version` is `None` or
+/// is not a `major.minor[.patch]` release covered by the known Cython floors:
+/// a missing version must never fail a build that would otherwise work.
+pub fn cython_limited_api_minor(cython_version: Option<&str>) -> u32 {
+    let Some((major, minor)) = cython_version.and_then(parse_cython_release) else {
+        return MIN_LIMITED_API_MINOR;
+    };
+
+    CYTHON_LIMITED_API_FLOORS
+        .iter()
+        .filter(|((cython_major, cython_minor), _)| {
+            (major, minor) >= (*cython_major, *cython_minor)
+        })
+        .map(|(_, floor)| *floor)
+        .max()
+        .unwrap_or(MIN_LIMITED_API_MINOR)
+}
 
 /// Build the `Py_LIMITED_API` macro value for a Python `major.minor` version.
 ///
@@ -58,20 +89,103 @@ pub const MIN_LIMITED_API_MINOR: u32 = 9;
 /// Returns an error when the target predates the Limited API support that
 /// Cython requires, or when it is not a Python 3.x version.
 pub fn limited_api_macro(major: u32, minor: u32) -> Result<String> {
+    limited_api_macro_for_cython(major, minor, None)
+}
+
+/// Build the `Py_LIMITED_API` macro value, reporting the Cython version that
+/// imposes the floor.
+///
+/// Cython is installed without an upper version bound, so the floor is looked
+/// up from the version that actually ended up in the build environment.
+/// `cython_version` is `None` when that version could not be determined, in
+/// which case [`MIN_LIMITED_API_MINOR`] applies and the error names no Cython
+/// release.
+///
+/// # Errors
+///
+/// Returns an error when the target predates the Limited API support that
+/// Cython requires, or when it is not a Python 3.x version.
+pub fn limited_api_macro_for_cython(
+    major: u32,
+    minor: u32,
+    cython_version: Option<&str>,
+) -> Result<String> {
     if major != 3 {
         return Err(anyhow!(
             "Unsupported Python version {major}.{minor}: py2pyd can only build Limited API extensions for Python 3"
         ));
     }
 
-    if minor < MIN_LIMITED_API_MINOR {
-        return Err(anyhow!(
-            "Python 3.{minor} is too old for a Limited API build: Cython requires Python 3.{MIN_LIMITED_API_MINOR} or newer. \
-             Select a newer interpreter with --python-version or --python-path"
-        ));
+    let floor = cython_limited_api_minor(cython_version);
+
+    if minor < floor {
+        return Err(match cython_version {
+            Some(version) => anyhow!(
+                "Python 3.{minor} is too old for a Limited API build: Cython {version} requires Python 3.{floor} or newer. \
+                 Select a newer interpreter with --python-version or --python-path"
+            ),
+            None => anyhow!(
+                "Python 3.{minor} is too old for a Limited API build: Cython requires Python 3.{floor} or newer. \
+                 Select a newer interpreter with --python-version or --python-path"
+            ),
+        });
     }
 
     Ok(format!("0x{major:02X}{minor:02X}0000"))
+}
+
+/// Read a `major.minor` release from a Cython version string such as `3.3.0`.
+fn parse_cython_release(version: &str) -> Option<(u32, u32)> {
+    let mut parts = version.trim().trim_start_matches('v').split('.');
+    let major = parts.next()?.parse::<u32>().ok()?;
+    let minor = parts.next()?.parse::<u32>().ok()?;
+    Some((major, minor))
+}
+
+/// Pick the version token out of `cython --version` output.
+///
+/// The command prints `Cython version <version>`; the version is returned
+/// untouched so it can be quoted in diagnostics.
+fn parse_cython_version(output: &str) -> Option<String> {
+    output
+        .split_whitespace()
+        .map(|token| token.trim().trim_start_matches('v'))
+        .find(|token| token.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .map(|token| {
+            token
+                .chars()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect()
+        })
+        .filter(|version: &String| parse_cython_release(version).is_some())
+}
+
+/// Ask a Python environment which Cython version it has installed.
+///
+/// `python -m cython --version` is tried first because it uses the
+/// interpreter the build will actually run; importing `Cython` is the fallback
+/// for environments without that entry point. Returns `None` when neither
+/// works: the Limited API floor then falls back to
+/// [`MIN_LIMITED_API_MINOR`] rather than failing the build.
+pub fn detect_cython_version(python: &Path) -> Option<String> {
+    let commands: [(&str, &[&str]); 2] = [
+        ("-m", &["cython", "--version"]),
+        ("-c", &["import Cython; print(Cython.__version__)"]),
+    ];
+
+    for (flag, args) in commands {
+        let Ok(output) = Command::new(python).arg(flag).args(args).output() else {
+            continue;
+        };
+
+        if output.status.success() {
+            if let Some(version) = parse_cython_version(&String::from_utf8_lossy(&output.stdout)) {
+                return Some(version);
+            }
+        }
+    }
+
+    None
 }
 
 /// Parse a `major.minor` Python version string such as `3.12`.
@@ -147,11 +261,16 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     // Resolve the Limited API target from an explicitly requested Python
     // version before spending time on the uv environment. Without an explicit
     // version the target is only known once uv picked an interpreter.
-    let requested_limited_api = match &config.python_version {
+    let requested_target = match &config.python_version {
         Some(requested) => {
             let (major, minor) = parse_python_version(requested)
                 .with_context(|| format!("Invalid --python-version: {requested}"))?;
-            Some(limited_api_macro(major, minor)?)
+            // Reject a target below the default floor up front: it cannot
+            // succeed with any Cython version, so the check must not wait for
+            // uv. A newer Cython can still raise the floor, so the target is
+            // checked again once the environment reports its Cython version.
+            limited_api_macro(major, minor)?;
+            Some((major, minor))
         }
         None => None,
     };
@@ -187,20 +306,28 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
     );
     info!("Using Python interpreter: {}", uv_env.python_path.display());
 
+    // Cython is installed without an upper version bound, so ask the
+    // environment which one it picked instead of trusting the constant floor.
+    let cython_version = detect_cython_version(&uv_env.python_path);
+    match &cython_version {
+        Some(version) => info!("Building with Cython {version}"),
+        None => warn!(
+            "Could not determine the installed Cython version; assuming the Python 3.{MIN_LIMITED_API_MINOR} Limited API floor"
+        ),
+    }
+
     // `Py_LIMITED_API` has to match the interpreter we build with. A mismatch
     // makes Cython abort the build with `fatal error C1189`.
-    let limited_api = match requested_limited_api {
-        Some(value) => value,
-        None => {
-            let (major, minor) = detect_python_version(&uv_env.python_path).with_context(|| {
-                format!(
-                    "Failed to determine the Python version of {}",
-                    uv_env.python_path.display()
-                )
-            })?;
-            limited_api_macro(major, minor)?
-        }
+    let (major, minor) = match requested_target {
+        Some(target) => target,
+        None => detect_python_version(&uv_env.python_path).with_context(|| {
+            format!(
+                "Failed to determine the Python version of {}",
+                uv_env.python_path.display()
+            )
+        })?,
     };
+    let limited_api = limited_api_macro_for_cython(major, minor, cython_version.as_deref())?;
     info!("Building with Py_LIMITED_API={limited_api}");
 
     // Create the setup.py file
@@ -473,6 +600,79 @@ mod tests {
     fn test_limited_api_macro_rejects_python_2() {
         let err = limited_api_macro(2, 7).unwrap_err().to_string();
         assert!(err.contains("Unsupported Python version 2.7"), "{err}");
+    }
+
+    /// A future Cython can raise the Limited API floor. The error has to name
+    /// the Cython version that set it, otherwise the failure looks like the
+    /// interpreter being too old and sends users down the wrong path.
+    #[test]
+    fn test_limited_api_error_names_the_installed_cython_version() {
+        let err = limited_api_macro_for_cython(3, 7, Some("3.3.0"))
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Cython 3.3.0"), "{err}");
+        assert!(err.contains("too old for a Limited API build"), "{err}");
+        assert!(err.contains("3.9 or newer"), "{err}");
+    }
+
+    /// Without a Cython version the constant floor still applies and the
+    /// message stays the one the README quotes.
+    #[test]
+    fn test_limited_api_error_falls_back_without_a_cython_version() {
+        let err = limited_api_macro_for_cython(3, 8, None)
+            .unwrap_err()
+            .to_string();
+
+        assert_eq!(
+            err,
+            "Python 3.8 is too old for a Limited API build: Cython requires Python 3.9 or newer. \
+             Select a newer interpreter with --python-version or --python-path"
+        );
+        assert!(!err.contains("Cython 3."), "{err}");
+        assert_eq!(limited_api_macro(3, 8).unwrap_err().to_string(), err);
+    }
+
+    #[test]
+    fn test_cython_limited_api_minor_uses_the_known_floor() {
+        assert_eq!(cython_limited_api_minor(Some("3.3.0")), 9);
+        assert_eq!(cython_limited_api_minor(Some("3.12.1")), 9);
+    }
+
+    /// An unknown or missing version must not fail the build, so the floor
+    /// falls back to the constant instead.
+    #[test]
+    fn test_cython_limited_api_minor_falls_back_to_the_constant() {
+        assert_eq!(cython_limited_api_minor(None), MIN_LIMITED_API_MINOR);
+        assert_eq!(
+            cython_limited_api_minor(Some("not-a-version")),
+            MIN_LIMITED_API_MINOR
+        );
+        assert_eq!(cython_limited_api_minor(Some("")), MIN_LIMITED_API_MINOR);
+    }
+
+    #[test]
+    fn test_parse_cython_version_reads_the_command_output() {
+        assert_eq!(
+            parse_cython_version("Cython version 3.3.0\n").as_deref(),
+            Some("3.3.0")
+        );
+        assert_eq!(parse_cython_version("3.0.11").as_deref(), Some("3.0.11"));
+        assert_eq!(
+            parse_cython_version("Cython version 4.0.0a1").as_deref(),
+            Some("4.0.0")
+        );
+        assert_eq!(parse_cython_version("3"), None);
+        assert_eq!(parse_cython_version("no version here"), None);
+    }
+
+    /// A Cython version that cannot be queried degrades to the constant floor
+    /// rather than failing the compilation.
+    #[test]
+    fn test_detect_cython_version_is_none_for_a_missing_interpreter() {
+        let missing = std::env::temp_dir().join("py2pyd-no-such-cython");
+
+        assert_eq!(detect_cython_version(&missing), None);
     }
 
     #[test]
