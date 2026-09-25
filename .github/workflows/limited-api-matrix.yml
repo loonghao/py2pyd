@@ -105,9 +105,9 @@ jobs:
 
           # Seeded: the previous step already fetched it, so offline should work.
           if UV_OFFLINE=1 uv python install "${floor}" >"${LOGS}/offline_seeded.log" 2>&1; then
-            echo "- interpreter already cached: **builds offline**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- interpreter already cached: **builds offline**" | tee -a "$GITHUB_STEP_SUMMARY"
           else
-            echo "- interpreter already cached: fails offline" >> "$GITHUB_STEP_SUMMARY"
+            echo "- interpreter already cached: fails offline" | tee -a "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat "${LOGS}/offline_seeded.log" >> "$GITHUB_STEP_SUMMARY" || true
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -117,9 +117,9 @@ jobs:
           cold_dir="$(mktemp -d)"
           if UV_OFFLINE=1 UV_PYTHON_INSTALL_DIR="${cold_dir}" \
                uv python install "${floor}" >"${LOGS}/offline_cold.log" 2>&1; then
-            echo "- cold machine: unexpectedly succeeded offline" >> "$GITHUB_STEP_SUMMARY"
+            echo "- cold machine: unexpectedly succeeded offline" | tee -a "$GITHUB_STEP_SUMMARY"
           else
-            echo "- cold machine: **needs network** (uv reports an offline error)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- cold machine: **needs network** (uv reports an offline error)" | tee -a "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat "${LOGS}/offline_cold.log" >> "$GITHUB_STEP_SUMMARY" || true
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -166,7 +166,7 @@ jobs:
             else
               result=FAILED
             fi
-            echo "| ${fixture} | ${result} | \`${macro:-not logged}\` |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| ${fixture} | ${result} | \`${macro:-not logged}\` |" | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
           exit "${build_failures}"
@@ -193,7 +193,7 @@ jobs:
             fi
 
             if ! interpreter="$(uv python find "${version}" 2>/dev/null)"; then
-              echo "| ${version} | interpreter unavailable | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ${version} | interpreter unavailable | - | - | - |" | tee -a "$GITHUB_STEP_SUMMARY"
               continue
             fi
 
@@ -209,7 +209,7 @@ jobs:
           ]))
           " 2>&1)"; then
               failures=$((failures + 1))
-              echo "| ${version} | FAILED | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ${version} | FAILED | - | - | - |" | tee -a "$GITHUB_STEP_SUMMARY"
               echo "${result}"
               continue
             fi
@@ -218,7 +218,7 @@ jobs:
             match_out="$(echo "${result}" | tail -n1 | cut -d'|' -f2)"
             div_out="$(echo "${result}" | tail -n1 | cut -d'|' -f3)"
             str_out="$(echo "${result}" | tail -n1 | cut -d'|' -f4)"
-            echo "| ${version} | ${portable_add} | ${match_out} | ${div_out} | ${str_out} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| ${version} | ${portable_add} | ${match_out} | ${div_out} | ${str_out} |" | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
