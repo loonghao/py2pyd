@@ -1,0 +1,237 @@
+name: Limited API matrix
+
+# Verifies the portability contract that the README advertises: an extension
+# built against an explicit `--python-version` floor loads on that release and
+# on every later 3.x. It is the evidence base for pinning the default target
+# low, so it runs against the floor itself rather than against a single
+# interpreter.
+#
+# The weekly canary matters: the two things this canary watches are outside
+# this repository's control -- whether `uv` can still fetch the floor
+# interpreter, and whether the installed Cython still accepts it. Both drift
+# silently, and either one turns "portable by default" into a broken build.
+
+on:
+  workflow_dispatch:
+    inputs:
+      floor:
+        description: 'Limited API floor to verify (e.g. 3.9)'
+        required: false
+        default: '3.9'
+  pull_request:
+    paths:
+      - 'src/uv_compiler.rs'
+      - 'src/uv_env.rs'
+      - 'src/compiler/**'
+      - 'tests/fixtures/limited_api/**'
+      - '.github/workflows/limited-api-matrix.yml'
+  schedule:
+    # Weekly canary, offset from the nightly CI cron.
+    - cron: '17 04 * * 1'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  verify:
+    name: ${{ matrix.os }} - floor ${{ matrix.floor }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        floor: ['3.9', '3.10']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build py2pyd
+        run: cargo build --release --workspace
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      # py2pyd refuses to run without a compiler on PATH; on Windows that means
+      # the MSVC tools, which the runner image does not export by default.
+      - name: Add MSVC to PATH (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Availability is a fact to record, not a failure: whether `uv` can fetch
+      # an end-of-life interpreter is decided upstream. The weekly canary turns
+      # it into a failure so the drift is noticed; PRs should not break on it.
+      - name: Probe whether uv can fetch the floor interpreter
+        id: probe
+        shell: bash
+        run: |
+          set -uo pipefail
+          floor="${{ matrix.floor }}"
+          echo "### Fetching CPython ${floor}" >> "$GITHUB_STEP_SUMMARY"
+          if uv python install "${floor}" 2>&1 | tee /tmp/probe.log; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "ok" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/probe.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Offline behaviour: a build is only hermetic when the floor interpreter
+      # is already present, so record both halves rather than assuming.
+      - name: Probe offline availability
+        if: steps.probe.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          floor="${{ matrix.floor }}"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Offline behaviour (CPython ${floor})" >> "$GITHUB_STEP_SUMMARY"
+
+          # Already installed by the previous step, so this is the seeded case.
+          if UV_OFFLINE=1 uv python install "${floor}" >/tmp/offline_seeded.log 2>&1; then
+            echo "- seeded cache: **works offline**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- seeded cache: fails offline" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # A patch release that has never been fetched is the unseeded case.
+          unseeded="$(uv python list --all-versions 2>/dev/null \
+            | grep -oE "^cpython-${floor//./\\.}[0-9]+-.*<download available>" \
+            | awk '{print $1}' | head -n1)"
+          if [ -n "${unseeded}" ]; then
+            if UV_OFFLINE=1 uv python install "${unseeded}" >/tmp/offline_unseeded.log 2>&1; then
+              echo "- unseeded (${unseeded}): unexpectedly succeeded offline" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- unseeded (${unseeded}): **needs network**, as expected" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Build the fixtures against the floor
+        if: steps.probe.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          floor="${{ matrix.floor }}"
+          mkdir -p build/matrix
+
+          # Windows only imports extension modules named *.pyd; POSIX uses *.so.
+          if [ "${{ runner.os }}" = "Windows" ]; then ext="pyd"; else ext="so"; fi
+
+          for fixture in portable syntax310 levelprobe; do
+            echo "::group::build ${fixture} @ ${floor}"
+            if [ "${{ runner.os }}" = "Windows" ]; then
+              ./target/release/py2pyd.exe --python-version "${floor}" compile \
+                -i "tests/fixtures/limited_api/${fixture}.py" \
+                -o "build/matrix/${fixture}.${ext}" 2>&1 | tee "/tmp/build_${fixture}.log"
+            else
+              ./target/release/py2pyd --python-version "${floor}" compile \
+                -i "tests/fixtures/limited_api/${fixture}.py" \
+                -o "build/matrix/${fixture}.${ext}" 2>&1 | tee "/tmp/build_${fixture}.log"
+            fi
+            echo "::endgroup::"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Build against CPython ${floor}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| fixture | result | Py_LIMITED_API |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for fixture in portable syntax310 levelprobe; do
+            macro="$(grep -oE 'Py_LIMITED_API=0x[0-9A-F]+' "/tmp/build_${fixture}.log" | head -n1)"
+            echo "| ${fixture} | built | \`${macro:-not logged}\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      # The portability claim itself: import on the floor and on every later
+      # release this repository claims to support.
+      - name: Import the artifacts on the floor and later
+        if: steps.probe.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          floor="${{ matrix.floor }}"
+          failures=0
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Import matrix (built against CPython ${floor})" >> "$GITHUB_STEP_SUMMARY"
+          echo "| interpreter | portable | syntax310 | div(7,2) | str |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+          for version in 3.9 3.10 3.11 3.12 3.13 3.14; do
+            # Skip releases older than the floor: those are not claimed to work.
+            if [ "$(printf '%s\n%s\n' "${floor}" "${version}" | sort -V | head -n1)" != "${floor}" ]; then
+              continue
+            fi
+
+            if ! interpreter="$(uv python find "${version}" 2>/dev/null)"; then
+              echo "| ${version} | interpreter unavailable | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if ! result="$("${interpreter}" -c "
+          import sys
+          sys.path.insert(0, 'build/matrix')
+          import portable, syntax310, levelprobe
+          print('|'.join([
+              str(portable.add(2, 3)),
+              syntax310.classify([1, 2]),
+              str(levelprobe.div(7, 2)),
+              levelprobe.str_kind(),
+          ]))
+          " 2>&1)"; then
+              failures=$((failures + 1))
+              echo "| ${version} | FAILED | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              echo "${result}"
+              continue
+            fi
+
+            portable_add="$(echo "${result}" | tail -n1 | cut -d'|' -f1)"
+            match_out="$(echo "${result}" | tail -n1 | cut -d'|' -f2)"
+            div_out="$(echo "${result}" | tail -n1 | cut -d'|' -f3)"
+            str_out="$(echo "${result}" | tail -n1 | cut -d'|' -f4)"
+            echo "| ${version} | ${portable_add} | ${match_out} | ${div_out} | ${str_out} |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Failures: ${failures}" >> "$GITHUB_STEP_SUMMARY"
+          exit "${failures}"
+
+      # `div(7, 2)` must be 3.5 (Python 3 semantics). Cython's documented
+      # default for an unset `language_level` is Python 2, so this is the guard
+      # that the generated extension module keeps modern semantics.
+      - name: Assert Python 3 semantics
+        if: steps.probe.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          floor="${{ matrix.floor }}"
+          interpreter="$(uv python find "${floor}")"
+          result="$("${interpreter}" -c "
+          import sys
+          sys.path.insert(0, 'build/matrix')
+          import levelprobe
+          print(levelprobe.div(7, 2))
+          ")"
+          echo "div(7, 2) = ${result}"
+          test "${result}" = "3.5"
+
+      # Fail the weekly canary when the floor interpreter has disappeared, so
+      # the portability claim is re-checked rather than left to rot.
+      - name: Fail the canary when the floor is unavailable
+        if: steps.probe.outputs.available != 'true' && github.event_name == 'schedule'
+        shell: bash
+        run: |
+          echo "CPython ${{ matrix.floor }} is no longer fetchable on ${{ matrix.os }}." \
+               "Anything that pins the Limited API floor to it will break."
+          exit 1
