@@ -56,10 +56,12 @@ pub const MIN_LIMITED_API_MINOR: u32 = 9;
 
 /// `Py_LIMITED_API` floors introduced by Cython releases, newest last.
 ///
-/// Cython writes its floor into every generated C file, so a Cython upgrade
-/// can raise the oldest target py2pyd is able to build. Keeping the measured
-/// floors here lets the error name the real requirement instead of blaming the
-/// interpreter for a Cython upgrade.
+/// This table is only a **fallback**. The authoritative floor is read from the
+/// installed Cython's `ModuleSetupCode.c` by
+/// [`detect_cython_limited_api_minor`]; this table is consulted when that file
+/// cannot be read. It therefore carries a maintenance obligation: add an entry
+/// whenever a Cython release raises its floor, or the fallback silently
+/// under-reports the requirement for that release.
 const CYTHON_LIMITED_API_FLOORS: &[((u32, u32), u32)] = &[((3, 3), MIN_LIMITED_API_MINOR)];
 
 /// Oldest `Py_LIMITED_API` minor version the given Cython release supports.
@@ -110,13 +112,36 @@ pub fn limited_api_macro_for_cython(
     minor: u32,
     cython_version: Option<&str>,
 ) -> Result<String> {
+    limited_api_macro_for_floor(
+        major,
+        minor,
+        cython_limited_api_minor(cython_version),
+        cython_version,
+    )
+}
+
+/// Build the `Py_LIMITED_API` macro value against a known Cython floor.
+///
+/// Prefer this over [`limited_api_macro_for_cython`] when the floor was read
+/// from the installed Cython by [`detect_cython_limited_api_minor`]: that value
+/// is authoritative, whereas the table behind the other function only covers
+/// releases measured by hand.
+///
+/// # Errors
+///
+/// Returns an error when the target predates the Limited API support that
+/// Cython requires, or when it is not a Python 3.x version.
+pub fn limited_api_macro_for_floor(
+    major: u32,
+    minor: u32,
+    floor: u32,
+    cython_version: Option<&str>,
+) -> Result<String> {
     if major != 3 {
         return Err(anyhow!(
             "Unsupported Python version {major}.{minor}: py2pyd can only build Limited API extensions for Python 3"
         ));
     }
-
-    let floor = cython_limited_api_minor(cython_version);
 
     if minor < floor {
         return Err(match cython_version {
@@ -146,18 +171,23 @@ fn parse_cython_release(version: &str) -> Option<(u32, u32)> {
 ///
 /// The command prints `Cython version <version>`; the version is returned
 /// untouched so it can be quoted in diagnostics.
+///
+/// The parse and the validity check are folded into a single pass so a leading
+/// numeric token that is not a version (a date, a log counter) is skipped
+/// instead of masking the real version further along the line.
 fn parse_cython_version(output: &str) -> Option<String> {
     output
         .split_whitespace()
         .map(|token| token.trim().trim_start_matches('v'))
-        .find(|token| token.chars().next().is_some_and(|c| c.is_ascii_digit()))
-        .map(|token| {
-            token
+        .filter_map(|token| {
+            let version: String = token
                 .chars()
                 .take_while(|c| c.is_ascii_digit() || *c == '.')
-                .collect()
+                .collect();
+
+            parse_cython_release(&version).map(|_| version)
         })
-        .filter(|version: &String| parse_cython_release(version).is_some())
+        .next()
 }
 
 /// Ask a Python environment which Cython version it has installed.
@@ -186,6 +216,68 @@ pub fn detect_cython_version(python: &Path) -> Option<String> {
     }
 
     None
+}
+
+/// Read the `Py_LIMITED_API` floor Cython enforces in its generated C code.
+///
+/// Cython ships the requirement in `Cython/Utility/ModuleSetupCode.c` as
+/// `#if Py_LIMITED_API < 0x03090000`, and the C compiler turns a violation into
+/// `fatal error C1189`. Reading it from the installed Cython keeps the floor
+/// honest: a future Cython that raises it is picked up automatically instead of
+/// waiting for someone to notice the bare compiler error and update the
+/// [`CYTHON_LIMITED_API_FLOORS`] fallback by hand.
+///
+/// Returns `None` when no `major.minor.0` bound is present, so callers keep
+/// their fallback instead of acting on a misread value.
+pub fn cython_limited_api_minor_from_source(setup_code: &str) -> Option<u32> {
+    setup_code.lines().find_map(|line| {
+        let bound = line.split_once("Py_LIMITED_API <")?.1.trim();
+        let hex = bound.split_whitespace().next()?;
+        let value =
+            u32::from_str_radix(hex.trim_start_matches("0x").trim_end_matches('U'), 16).ok()?;
+
+        // `0x03090000`: major in the top byte, minor next, micro zero.
+        let (major, minor, micro) = (value >> 24, (value >> 16) & 0xFF, value & 0xFFFF);
+        (major == 3 && micro == 0).then_some(minor)
+    })
+}
+
+/// Ask a Python environment where its Cython package lives.
+fn cython_package_root(python: &Path) -> Option<PathBuf> {
+    let output = Command::new(python)
+        .arg("-c")
+        .arg("import Cython, os; print(os.path.dirname(Cython.__file__))")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    (!path.as_os_str().is_empty()).then_some(path)
+}
+
+/// Read the Limited API floor from the Cython installed in `python`.
+///
+/// Returns `None` when Cython is missing or its source is unreadable (for
+/// example a wheel that ships only bytecode), in which case the caller falls
+/// back to [`cython_limited_api_minor`].
+pub fn detect_cython_limited_api_minor(python: &Path) -> Option<u32> {
+    let setup_code_path = cython_package_root(python)?
+        .join("Utility")
+        .join("ModuleSetupCode.c");
+    let setup_code = fs::read_to_string(&setup_code_path).ok()?;
+
+    let minor = cython_limited_api_minor_from_source(&setup_code);
+    if minor.is_none() {
+        warn!(
+            "Could not find a Py_LIMITED_API bound in {}",
+            setup_code_path.display()
+        );
+    }
+
+    minor
 }
 
 /// Parse a `major.minor` Python version string such as `3.12`.
@@ -316,6 +408,19 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
         ),
     }
 
+    // Read the floor out of the Cython that actually got installed rather than
+    // trusting a table of hand-measured releases: a Cython that raises its
+    // floor would otherwise keep reporting the old number and fail later with a
+    // bare `fatal error C1189`. The table is the fallback for Cython installs
+    // whose source is not available.
+    let floor = match detect_cython_limited_api_minor(&uv_env.python_path) {
+        Some(minor) => {
+            debug!("Cython enforces a Python 3.{minor} Limited API floor");
+            minor
+        }
+        None => cython_limited_api_minor(cython_version.as_deref()),
+    };
+
     // `Py_LIMITED_API` has to match the interpreter we build with. A mismatch
     // makes Cython abort the build with `fatal error C1189`.
     let (major, minor) = match requested_target {
@@ -327,7 +432,7 @@ pub fn compile_file(input_path: &Path, output_path: &Path, config: &CompileConfi
             )
         })?,
     };
-    let limited_api = limited_api_macro_for_cython(major, minor, cython_version.as_deref())?;
+    let limited_api = limited_api_macro_for_floor(major, minor, floor, cython_version.as_deref())?;
     info!("Building with Py_LIMITED_API={limited_api}");
 
     // Create the setup.py file
@@ -664,6 +769,114 @@ mod tests {
         );
         assert_eq!(parse_cython_version("3"), None);
         assert_eq!(parse_cython_version("no version here"), None);
+    }
+
+    /// A leading token that starts with a digit but is not a version used to
+    /// win the `find` and then fail the `filter`, hiding the real version.
+    #[test]
+    fn test_parse_cython_version_skips_leading_numeric_noise() {
+        assert_eq!(
+            parse_cython_version("2024-01-01 Cython version 3.3.0").as_deref(),
+            Some("3.3.0")
+        );
+        assert_eq!(
+            parse_cython_version("12 warnings Cython version 3.0.11").as_deref(),
+            Some("3.0.11")
+        );
+        assert_eq!(parse_cython_version("2024-01-01 00:00:00"), None);
+    }
+
+    /// The floor is read from the guard Cython actually compiles, so a Cython
+    /// that raises it is picked up without a table edit.
+    #[test]
+    fn test_cython_limited_api_minor_from_source_reads_the_guard() {
+        let source = "\
+            #ifdef Py_LIMITED_API
+              #define __PYX_LIMITED_VERSION_HEX Py_LIMITED_API
+              #if Py_LIMITED_API < 0x03090000
+                #error \"Cython 3.3 requires the Python Limited API version to be 3.9 or greater.\"
+              #endif
+            #endif
+        ";
+
+        assert_eq!(cython_limited_api_minor_from_source(source), Some(9));
+    }
+
+    /// A hypothetical Cython that raises the floor has to be reported at the
+    /// new value; this is the regression the static table could not cover.
+    #[test]
+    fn test_cython_limited_api_minor_from_source_tracks_a_raised_floor() {
+        let source = "#if Py_LIMITED_API < 0x030B0000";
+
+        assert_eq!(cython_limited_api_minor_from_source(source), Some(11));
+    }
+
+    /// A bound that is not a `3.minor.0` target is not a floor py2pyd can act
+    /// on, so it degrades to the fallback instead of inventing a number.
+    #[test]
+    fn test_cython_limited_api_minor_from_source_ignores_unusable_bounds() {
+        assert_eq!(
+            cython_limited_api_minor_from_source("#if Py_LIMITED_API < 0x02070000"),
+            None
+        );
+        assert_eq!(
+            cython_limited_api_minor_from_source("#if Py_LIMITED_API < 0x03090001"),
+            None
+        );
+        assert_eq!(
+            cython_limited_api_minor_from_source("#if Py_LIMITED_API < PY_VERSION"),
+            None
+        );
+        assert_eq!(cython_limited_api_minor_from_source(""), None);
+    }
+
+    /// The detected floor drives the error, so the message stays correct even
+    /// when it disagrees with the hand-measured fallback table.
+    #[test]
+    fn test_limited_api_error_uses_the_detected_floor() {
+        let err = limited_api_macro_for_floor(3, 9, 11, Some("4.0.0"))
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Cython 4.0.0"), "{err}");
+        assert!(err.contains("3.11 or newer"), "{err}");
+        assert!(!err.contains("3.9 or newer"), "{err}");
+    }
+
+    /// Guards against the table silently drifting below the constant it is
+    /// supposed to be a refinement of.
+    #[test]
+    fn test_cython_floor_table_is_consistent_with_the_constant() {
+        for (_, floor) in CYTHON_LIMITED_API_FLOORS {
+            assert!(
+                *floor >= MIN_LIMITED_API_MINOR,
+                "a recorded Cython floor ({floor}) is below the assumed minimum ({MIN_LIMITED_API_MINOR})"
+            );
+        }
+    }
+
+    /// End-to-end: the floor read from a real Cython install must match what
+    /// that Cython enforces. Skipped where Cython is not installed.
+    #[test]
+    fn test_detect_cython_limited_api_minor_reads_the_installed_cython() {
+        let Some(python) = find_interpreter() else {
+            eprintln!("skipping: no python3/python on PATH");
+            return;
+        };
+
+        let Some(version) = detect_cython_version(&python) else {
+            eprintln!("skipping: no Cython in {}", python.display());
+            return;
+        };
+
+        let detected = detect_cython_limited_api_minor(&python)
+            .expect("Cython is installed, so ModuleSetupCode.c should be readable");
+
+        assert_eq!(
+            detected,
+            cython_limited_api_minor(Some(&version)),
+            "Cython {version} enforces a Python 3.{detected} floor but the table says otherwise"
+        );
     }
 
     /// A Cython version that cannot be queried degrades to the constant floor
