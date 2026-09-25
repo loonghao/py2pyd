@@ -225,7 +225,7 @@ pub fn detect_cython_version(python: &Path) -> Option<String> {
 /// `fatal error C1189`. Reading it from the installed Cython keeps the floor
 /// honest: a future Cython that raises it is picked up automatically instead of
 /// waiting for someone to notice the bare compiler error and update the
-/// [`CYTHON_LIMITED_API_FLOORS`] fallback by hand.
+/// fallback table of measured releases by hand.
 ///
 /// Returns `None` when no `major.minor.0` bound is present, so callers keep
 /// their fallback instead of acting on a misread value.
