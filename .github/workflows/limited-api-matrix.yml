@@ -180,6 +180,7 @@ jobs:
           set -uo pipefail
           floor="${{ matrix.floor }}"
           failures=0
+          untested=0
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Import matrix (built against CPython ${floor})" >> "$GITHUB_STEP_SUMMARY"
@@ -192,10 +193,16 @@ jobs:
               continue
             fi
 
-            if ! interpreter="$(uv python find "${version}" 2>/dev/null)"; then
+            # Install first: `uv python find` only reports what is already on
+            # the machine, so relying on it alone silently skipped versions
+            # and the matrix passed without testing them.
+            if ! uv python install "${version}" >/dev/null 2>&1; then
               echo "| ${version} | interpreter unavailable | - | - | - |" | tee -a "$GITHUB_STEP_SUMMARY"
+              untested=$((untested + 1))
               continue
             fi
+
+            interpreter="$(uv python find "${version}")"
 
             if ! result="$("${interpreter}" -c "
           import sys
@@ -222,8 +229,12 @@ jobs:
           done
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Failures: ${failures}" >> "$GITHUB_STEP_SUMMARY"
-          exit "${failures}"
+          echo "Import failures: ${failures}, untestable versions: ${untested}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # A version that cannot be installed is a gap in the matrix, not
+          # a pass: the portability claim covers 3.9-3.14, so silently
+          # testing three of six releases would be a false green.
+          exit $((failures + untested))
 
       # `div(7, 2)` must be 3.5 (Python 3 semantics). Cython's documented
       # default for an unset `language_level` is Python 2, so this is the guard
