@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/loonghao/py2pyd/compare/v0.1.6...v0.1.7) - 2026-09-25
+
+### Fixed
+
+- report the installed Cython version in the Limited API floor error
+- derive Py_LIMITED_API from the target Python version ([#108](https://github.com/loonghao/py2pyd/pull/108))
+- *(deps)* update rust crate turbo-cdn to 0.8.0
+- *(deps)* update rust crate reqwest to 0.13
+
+### Other
+
+- *(deps)* update rust crate tokio to v1.53.1
+- verify Limited API portability across platforms; derive the Cython floor from the installed Cython
+- state that Limited API portability needs an explicit target ([#110](https://github.com/loonghao/py2pyd/pull/110))
+- guard the batch exit-code and Limited API contracts ([#109](https://github.com/loonghao/py2pyd/pull/109))
+- correct release/versioning docs and stale README statements ([#105](https://github.com/loonghao/py2pyd/pull/105))
+- align README with the implemented CLI and remove decorative emoji
+- grant checks: write so the Security Audit job can publish its result
+- *(deps)* update rust crate serde_json to v1.0.151
+- *(deps)* update rust crate assert_cmd to v2.2.2
+- *(deps)* update rust crate flate2 to v1.1.10
+- *(deps)* update rust crate uuid to v1.26.1
+- *(deps)* update rust crate clap to v4.6.7
+- *(deps)* update rust crate anyhow to v1.0.104
+- *(deps)* update rust crate env_logger to v0.11.11
+- *(deps)* bump rand from 0.8.5 to 0.8.6 ([#92](https://github.com/loonghao/py2pyd/pull/92))
+- *(deps)* bump bytes to 1.11.1 and clear RUSTSEC advisories
+
 ## [0.1.6](https://github.com/loonghao/py2pyd/compare/v0.1.5...v0.1.6) - 2026-01-07
 
 ### Other
