@@ -12,10 +12,6 @@ permissions:
   contents: read
   actions: read
   security-events: write
-  # rustsec/audit-check needs to publish a check run with its findings.
-  # Without this, the Security Audit job fails with "Resource not accessible
-  # by integration" even when no vulnerabilities are found.
-  checks: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -66,10 +62,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      # `rustsec/audit-check` is deliberately not used here: on `schedule`
+      # events it reports findings by opening GitHub issues instead of
+      # publishing a check run, which requires `issues: write`. Without that
+      # scope the job failed with "Resource not accessible by integration"
+      # every night even though `cargo audit` reported zero vulnerabilities.
+      # Calling `cargo audit` directly exits non-zero only for real
+      # vulnerabilities, so scheduled, push and pull_request runs behave
+      # identically and informational warnings no longer turn the job red.
       - name: Run security audit
-        uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           # hickory-proto 0.25.2 is pulled in by turbo-cdn, which pins
           # hickory-resolver = "0.25" as a non-optional dependency.
           # RUSTSEC-2026-0118 has no patched release at all, and
@@ -77,7 +82,9 @@ jobs:
           # turbo-cdn does not accept. Neither is reachable by a version bump,
           # so they are ignored until turbo-cdn relaxes its hickory-resolver
           # requirement. Revisit on every turbo-cdn upgrade.
-          ignore: RUSTSEC-2026-0118,RUSTSEC-2026-0119
+          cargo audit \
+            --ignore RUSTSEC-2026-0118 \
+            --ignore RUSTSEC-2026-0119
 
   # Formatting check
   rustfmt:
