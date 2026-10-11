@@ -12,13 +12,9 @@
 //!
 //! One case cannot be hermetic: constructing a *partially* successful batch
 //! needs a module that genuinely compiles, which means a real Cython build
-//! through `uv`. `uv` is missing on the windows-latest runner and
-//! `uv_env::install_uv` does not put it on PATH for the running process, so
-//! that one test is ignored on Windows only. The contract is still covered
-//! there by the other cases: the two CLI tests pin both halves of the exit
-//! code mapping (`Err` => non-zero, `Ok` => zero) and
-//! `batch_outcome_decides_the_exit_code` pins every branch of the decision,
-//! including partial success.
+//! through `uv`. `uv` resolves on every runner because `find_uv_executable`
+//! probes the per-user install directory that the official installers use, so
+//! this case runs on Windows too.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -116,18 +112,6 @@ fn batch_exits_non_zero_when_every_file_fails() {
 /// reason (uv download, compiler hiccup) still leaves a partial batch to
 /// assert on. The contract under test is the exit code, the warning and the
 /// surviving artifacts, not the exact failure count.
-///
-/// Windows carries an explicit ignore rather than a runtime skip: `uv` is not
-/// on the windows-latest image, and `uv_env::install_uv` installs it outside
-/// the PATH of the running process, so every module fails there and a partial
-/// batch cannot be constructed at all. Leaving it un-ignored would make this
-/// test fail for an environmental reason on every Windows run while proving
-/// nothing about the contract. The other cases in this file keep the contract
-/// covered on Windows; see the module docs.
-#[cfg_attr(
-    target_os = "windows",
-    ignore = "needs a working uv toolchain; uv is absent from the windows image"
-)]
 #[test]
 fn batch_exits_zero_and_warns_when_only_some_files_fail() {
     if !build_toolchain_available() {

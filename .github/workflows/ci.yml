@@ -48,11 +48,37 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # Regression guard for the Windows uv resolution defect: the test matrix
+      # must also pass on a runner that starts with no `uv` on PATH, because
+      # installing `uv` only updates the persisted user PATH and is invisible to
+      # the already-running process. `find_uv_executable` resolves the install
+      # directory directly, so this only widens coverage -- it is not the fix.
+      - name: Hide preinstalled uv (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $uv = Get-Command uv -ErrorAction SilentlyContinue
+          if (-not $uv) { Write-Host "uv not preinstalled"; exit 0 }
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\uv-hidden" | Out-Null
+          Move-Item -Path $uv.Source -Destination "$env:RUNNER_TEMP\uv-hidden\" -Force
+          Write-Host "moved $($uv.Source) out of PATH"
+
       - name: Build
         run: cargo build --verbose --workspace
 
       - name: Run tests
         run: cargo test --verbose --workspace
+
+      - name: Restore preinstalled uv (windows)
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $hidden = "$env:RUNNER_TEMP\uv-hidden"
+          if (Test-Path $hidden) {
+            Get-ChildItem -Path $hidden -File | ForEach-Object {
+              Move-Item -Path $_.FullName -Destination (Get-Command uv -ErrorAction SilentlyContinue).Source -ErrorAction SilentlyContinue
+            }
+          }
 
   # Security audit using rustsec database
   security_audit:

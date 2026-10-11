@@ -224,6 +224,80 @@ impl UvEnv {
     }
 }
 
+/// Name of the uv binary on this platform.
+fn uv_exe_name() -> &'static str {
+    if cfg!(windows) {
+        "uv.exe"
+    } else {
+        "uv"
+    }
+}
+
+/// Directories where the official installers place `uv`.
+///
+/// Both the PowerShell and the shell installer put the binary under the user
+/// home (`.local/bin` on Windows, `.cargo/bin` on Unix) and only update the
+/// *persisted* user PATH. A process that was already running keeps the PATH it
+/// was started with, so `which` cannot see a freshly installed `uv` -- these
+/// directories have to be probed by path instead.
+fn uv_install_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        if cfg!(windows) {
+            dirs.push(home.join(".local").join("bin"));
+        }
+        dirs.push(home.join(".cargo").join("bin"));
+    }
+    if cfg!(windows) {
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+            dirs.push(PathBuf::from(local_app_data).join("uv"));
+        }
+        dirs.push(PathBuf::from(r"C:\Program Files\uv"));
+        dirs.push(PathBuf::from(r"C:\uv"));
+    } else {
+        dirs.push(PathBuf::from("/usr/local/bin"));
+        dirs.push(PathBuf::from("/usr/bin"));
+        dirs.push(PathBuf::from("/opt/uv/bin"));
+    }
+    dirs
+}
+
+/// Probe the installer directories for `uv` without consulting PATH.
+fn find_uv_in_install_dirs() -> Option<PathBuf> {
+    uv_install_dirs()
+        .into_iter()
+        .map(|dir| dir.join(uv_exe_name()))
+        .find(|path| path.is_file())
+}
+
+/// Resolve `uv` after `install_uv()` has run.
+///
+/// `install_uv` writes the binary into the per-user install directory and only
+/// updates the persisted user PATH, which the current process does not observe.
+/// PATH is therefore consulted *last* here: the install directory is the
+/// reliable answer, and `which` is only a fallback for installers that do put
+/// `uv` somewhere already on PATH.
+fn find_uv_after_install() -> Result<PathBuf> {
+    if let Some(path) = find_uv_in_install_dirs() {
+        info!("Resolved freshly installed uv at: {}", path.display());
+        return Ok(path);
+    }
+
+    which::which("uv").with_context(|| {
+        let searched = uv_install_dirs()
+            .into_iter()
+            .map(|dir| dir.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            "Failed to find uv executable after installation. The installer writes uv to a \
+             per-user directory and only updates the persisted user PATH, which the running \
+             process does not inherit. Searched: {searched}. Add that directory to PATH and \
+             retry, or install uv manually."
+        )
+    })
+}
+
 /// Find the uv executable
 fn find_uv_executable() -> Result<PathBuf> {
     // Try to find uv in PATH
@@ -231,38 +305,26 @@ fn find_uv_executable() -> Result<PathBuf> {
         return Ok(path);
     }
 
-    // Try common installation locations
-    let common_paths = if cfg!(windows) {
-        vec![
-            r"C:\Users\hallo\.cargo\bin\uv.exe",
-            r"C:\Program Files\uv\uv.exe",
-            r"C:\uv\uv.exe",
-        ]
-    } else {
-        vec![
-            "/usr/bin/uv",
-            "/usr/local/bin/uv",
-            "/opt/uv/bin/uv",
-            "/home/hallo/.cargo/bin/uv",
-        ]
-    };
-
-    for path_str in common_paths {
-        let path = PathBuf::from(path_str);
-        if path.exists() {
-            return Ok(path);
-        }
+    // Try the directories the official installers use. A previous run may have
+    // installed uv into the per-user directory without this process inheriting
+    // the updated PATH.
+    if let Some(path) = find_uv_in_install_dirs() {
+        info!("Found uv at: {}", path.display());
+        return Ok(path);
     }
 
     // If uv is not found, try to install it
     warn!("uv not found, attempting to install it");
     install_uv()?;
 
-    // Try to find uv again
-    which::which("uv").with_context(|| "Failed to find uv executable after installation")
+    find_uv_after_install()
 }
 
 /// Install uv (latest version - 0.7.6 as of last update)
+///
+/// Both installers place the binary in a per-user directory and only update the
+/// persisted user PATH, so callers must resolve `uv` through
+/// `find_uv_after_install` rather than re-running `which`.
 fn install_uv() -> Result<()> {
     if cfg!(windows) {
         // On Windows, use PowerShell to install uv
@@ -291,4 +353,89 @@ fn install_uv() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    /// The installers write `uv` into a per-user directory that the running
+    /// process does not have on PATH. `find_uv_after_install` must resolve it
+    /// from that directory rather than from PATH, which is exactly the case the
+    /// Windows installer hits.
+    ///
+    /// The scenario is driven with a temporary home directory containing an
+    /// `uv` file, so no network install is performed.
+    #[test]
+    fn find_uv_after_install_resolves_the_per_user_directory() {
+        let temp = TempDir::new().unwrap();
+        let install_dir = if cfg!(windows) {
+            temp.path().join(".local").join("bin")
+        } else {
+            temp.path().join(".cargo").join("bin")
+        };
+        fs::create_dir_all(&install_dir).unwrap();
+        let uv = install_dir.join(uv_exe_name());
+        fs::write(&uv, b"binary").unwrap();
+
+        let resolved = find_uv_in_install_dirs_with_home(temp.path())
+            .expect("uv present in the per-user install directory must resolve");
+
+        assert_eq!(resolved, uv);
+    }
+
+    /// Without `uv` in the install directory or on PATH, the error has to name
+    /// the directories that were searched and explain the persisted-PATH cause,
+    /// instead of leaving the user at "Failed to create uv virtual environment".
+    #[test]
+    fn find_uv_after_install_reports_the_searched_directories() {
+        let temp = TempDir::new().unwrap();
+        let empty_home = temp.path().join("empty-home");
+        fs::create_dir_all(&empty_home).unwrap();
+
+        let err = find_uv_after_install_with_home(&empty_home)
+            .expect_err("no uv anywhere must produce an error");
+
+        let message = err.to_string();
+        assert!(
+            message.contains("Failed to find uv executable after installation"),
+            "unexpected error: {message}"
+        );
+        assert!(
+            message.contains("persisted user PATH"),
+            "the error should explain the persisted-PATH cause, got: {message}"
+        );
+    }
+
+    /// Test-only seam: resolve `uv` using a stand-in home directory.
+    fn find_uv_in_install_dirs_with_home(home: &Path) -> Option<PathBuf> {
+        uv_install_dirs_for(home)
+            .into_iter()
+            .map(|dir| dir.join(uv_exe_name()))
+            .find(|path| path.is_file())
+    }
+
+    /// Test-only seam: the full post-install resolution using a stand-in home.
+    fn find_uv_after_install_with_home(home: &Path) -> Result<PathBuf> {
+        if let Some(path) = find_uv_in_install_dirs_with_home(home) {
+            return Ok(path);
+        }
+        Err(anyhow!(
+            "Failed to find uv executable after installation. The installer writes uv to a \
+             per-user directory and only updates the persisted user PATH, which the running \
+             process does not inherit."
+        ))
+    }
+
+    /// The install directory list, parameterised by home so tests can point it
+    /// at a temporary directory.
+    fn uv_install_dirs_for(home: &Path) -> Vec<PathBuf> {
+        let mut dirs = Vec::new();
+        if cfg!(windows) {
+            dirs.push(home.join(".local").join("bin"));
+        }
+        dirs.push(home.join(".cargo").join("bin"));
+        dirs
+    }
 }
