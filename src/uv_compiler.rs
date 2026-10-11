@@ -560,7 +560,9 @@ pub fn batch_compile(
                 success_count += 1;
             }
             Err(e) => {
-                warn!("Failed to compile {}: {}", input_path.display(), e);
+                // `{e:#}` renders the whole cause chain, not just the outer
+                // context: a bare `{}` hides why `uv venv` actually failed.
+                warn!("Failed to compile {}: {:#}", input_path.display(), e);
                 failure_count += 1;
             }
         }
