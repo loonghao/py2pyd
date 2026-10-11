@@ -333,26 +333,33 @@ fn find_uv_executable() -> Result<PathBuf> {
 /// `find_uv_after_install` rather than re-running `which`.
 fn install_uv() -> Result<()> {
     if cfg!(windows) {
-        // On Windows, use PowerShell to install uv. Capture stdout/stderr so a
-        // failing installer says why instead of collapsing into a bare failure.
-        let output = Command::new("powershell")
-            .arg("-ExecutionPolicy")
-            .arg("ByPass")
-            .arg("-Command")
-            .arg("irm https://astral.sh/uv/install.ps1 | iex")
-            .output()
-            .with_context(|| "Failed to execute PowerShell command to install uv")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            return Err(anyhow!(
-                "Failed to install uv (powershell exit status: {}). stderr:\n{}\nstdout:\n{}",
-                output.status,
-                stderr.trim(),
-                stdout.trim()
-            ));
+        // Prefer `pwsh` (PowerShell 7) and fall back to Windows PowerShell 5.1.
+        // `-ExecutionPolicy ByPass` is deliberately omitted: when the
+        // `Microsoft.PowerShell.Security` module cannot be loaded -- as on
+        // GitHub's Windows runners -- resolving that flag fails before the
+        // installer ever runs, producing an empty, silent failure.
+        let script = "irm https://astral.sh/uv/install.ps1 | iex";
+        let mut last_error = None;
+        for program in ["pwsh", "powershell"] {
+            match Command::new(program).arg("-Command").arg(script).output() {
+                Ok(output) if output.status.success() => return Ok(()),
+                Ok(output) => {
+                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    last_error = Some(anyhow!(
+                        "Failed to install uv via {program} (exit status: {}). stderr:\n{}\nstdout:\n{}",
+                        output.status,
+                        stderr,
+                        stdout
+                    ));
+                }
+                Err(e) => {
+                    last_error = Some(anyhow!("Failed to run {program} to install uv: {e}"));
+                }
+            }
         }
+        return Err(last_error
+            .unwrap_or_else(|| anyhow!("Failed to install uv: no PowerShell interpreter found")));
     } else {
         // On Unix, use curl to install uv
         let output = Command::new("sh")
