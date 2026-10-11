@@ -333,28 +333,41 @@ fn find_uv_executable() -> Result<PathBuf> {
 /// `find_uv_after_install` rather than re-running `which`.
 fn install_uv() -> Result<()> {
     if cfg!(windows) {
-        // On Windows, use PowerShell to install uv
-        let status = Command::new("powershell")
+        // On Windows, use PowerShell to install uv. Capture stdout/stderr so a
+        // failing installer says why instead of collapsing into a bare failure.
+        let output = Command::new("powershell")
             .arg("-ExecutionPolicy")
             .arg("ByPass")
             .arg("-Command")
             .arg("irm https://astral.sh/uv/install.ps1 | iex")
-            .status()
+            .output()
             .with_context(|| "Failed to execute PowerShell command to install uv")?;
 
-        if !status.success() {
-            return Err(anyhow!("Failed to install uv"));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return Err(anyhow!(
+                "Failed to install uv (powershell exit status: {}). stderr:\n{}\nstdout:\n{}",
+                output.status,
+                stderr.trim(),
+                stdout.trim()
+            ));
         }
     } else {
         // On Unix, use curl to install uv
-        let status = Command::new("sh")
+        let output = Command::new("sh")
             .arg("-c")
             .arg("curl -LsSf https://astral.sh/uv/install.sh | sh")
-            .status()
+            .output()
             .with_context(|| "Failed to execute shell command to install uv")?;
 
-        if !status.success() {
-            return Err(anyhow!("Failed to install uv"));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow!(
+                "Failed to install uv (sh exit status: {}). stderr:\n{}",
+                output.status,
+                stderr.trim()
+            ));
         }
     }
 
