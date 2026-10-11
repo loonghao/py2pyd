@@ -48,17 +48,26 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # py2pyd refuses to run without a compiler on PATH; on Windows that means
+      # the MSVC tools, which the runner image does not export by default.
+      - name: Add MSVC to PATH (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Regression guard for the Windows uv resolution defect: the test matrix
       # must also pass on a runner that starts with no `uv` on PATH, because
       # installing `uv` only updates the persisted user PATH and is invisible to
       # the already-running process. `find_uv_executable` resolves the install
       # directory directly, so this only widens coverage -- it is not the fix.
-      - name: Hide preinstalled uv (windows)
+      - name: Hide preinstalled uv (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $uv = Get-Command uv -ErrorAction SilentlyContinue
-          if (-not $uv) { Write-Host "uv not preinstalled"; exit 0 }
+          if (-not $uv) {
+            Write-Host "uv not preinstalled; the fresh-install path is exercised as-is"
+            exit 0
+          }
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\uv-hidden" | Out-Null
           Move-Item -Path $uv.Source -Destination "$env:RUNNER_TEMP\uv-hidden\" -Force
           Write-Host "moved $($uv.Source) out of PATH"
@@ -69,7 +78,7 @@ jobs:
       - name: Run tests
         run: cargo test --verbose --workspace
 
-      - name: Restore preinstalled uv (windows)
+      - name: Restore preinstalled uv (Windows)
         if: always() && runner.os == 'Windows'
         shell: pwsh
         run: |

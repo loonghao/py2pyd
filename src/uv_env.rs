@@ -102,11 +102,17 @@ impl UvEnv {
         // Add the path to the virtual environment
         cmd.arg(&venv_path);
 
-        // Run the command
-        let status = cmd.status().with_context(|| "Failed to execute uv venv")?;
+        // Run the command. Capture stderr so a failing `uv venv` reports why
+        // instead of collapsing into a bare "failed to create the environment".
+        let output = cmd.output().with_context(|| "Failed to execute uv venv")?;
 
-        if !status.success() {
-            return Err(anyhow!("Failed to create uv virtual environment"));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow!(
+                "Failed to create uv virtual environment (uv exit status: {}). uv stderr:\n{}",
+                output.status,
+                stderr.trim()
+            ));
         }
 
         // Get the path to the Python interpreter in the virtual environment
