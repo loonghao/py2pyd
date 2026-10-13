@@ -308,19 +308,31 @@ fn find_uv_after_install_for(home: Option<&Path>) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    which::which("uv").with_context(|| {
-        let searched = uv_install_dirs_for(home)
-            .into_iter()
-            .map(|dir| dir.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!(
-            "Failed to find uv executable after installation. The installer writes uv to a \
-             per-user directory and only updates the persisted user PATH, which the running \
-             process does not inherit. Searched: {searched}. Add that directory to PATH and \
-             retry, or install uv manually."
-        )
-    })
+    which::which("uv").with_context(|| uv_not_found_message(&uv_install_dirs_for(home)))
+}
+
+/// The error raised when `uv` cannot be resolved after an install.
+///
+/// Kept separate from the lookup so tests can assert on the exact wording users
+/// see, without having to drive the `which` fallback (whose outcome depends on
+/// whether the host happens to have `uv` on PATH).
+fn uv_not_found_error(searched: &[PathBuf]) -> anyhow::Error {
+    anyhow!(uv_not_found_message(searched))
+}
+
+/// The message for [`uv_not_found_error`].
+fn uv_not_found_message(searched: &[PathBuf]) -> String {
+    let searched = searched
+        .iter()
+        .map(|dir| dir.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "Failed to find uv executable after installation. The installer writes uv to a \
+         per-user directory and only updates the persisted user PATH, which the running \
+         process does not inherit. Searched: {searched}. Add that directory to PATH and \
+         retry, or install uv manually."
+    )
 }
 
 /// Find the uv executable
@@ -516,14 +528,22 @@ mod tests {
             "the searched-directory list should name `.cargo/bin`, got: {searched}"
         );
 
-        // The error text is what the user actually sees, so verify the wording
-        // that carries the diagnosis and the list built above.
-        let message = format!(
-            "Failed to find uv executable after installation. The installer writes uv to a \
-             per-user directory and only updates the persisted user PATH, which the running \
-             process does not inherit. Searched: {searched}."
+        // The error text is what the user actually sees, and it has to be the
+        // one the production code builds -- not a string this test composes
+        // itself, which would hold no matter what the production code did.
+        let message = uv_not_found_error(&uv_install_dirs_for(Some(&empty_home))).to_string();
+        assert!(
+            message.contains("Failed to find uv executable after installation"),
+            "unexpected error: {message}"
         );
-        assert!(message.contains("persisted user PATH"));
+        assert!(
+            message.contains("persisted user PATH"),
+            "the error should explain the persisted-PATH cause, got: {message}"
+        );
+        assert!(
+            message.contains(&needle),
+            "the error should name the probed installer directory {needle}, got: {message}"
+        );
     }
 
     /// `find_uv_after_install` is the production entry point `find_uv_executable`
@@ -535,6 +555,17 @@ mod tests {
         // whether `uv` is installed on the host, so this asserts only that the
         // call is wired up and does not panic.
         let _ = find_uv_after_install();
+    }
+
+    /// The production `find_uv_in_install_dirs()` has to agree with the
+    /// parameterised version it delegates to, so testing the parameterised
+    /// version really does cover the function `find_uv_executable` uses.
+    #[test]
+    fn find_uv_in_install_dirs_delegates_to_the_parameterised_helper() {
+        assert_eq!(
+            find_uv_in_install_dirs(),
+            find_uv_in_install_dirs_for(dirs::home_dir().as_deref())
+        );
     }
 
     /// A `uv` that is only in the install directory must be found by probing
