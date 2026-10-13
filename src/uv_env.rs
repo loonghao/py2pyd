@@ -365,16 +365,17 @@ fn find_uv_executable() -> Result<PathBuf> {
 /// to resolve the host still produced a zero exit status and the failure was
 /// reported as a successful install.
 ///
-/// `set -o pipefail` is intentionally not used. It is a bash/ksh extension that
-/// POSIX `sh` (dash on Debian and Ubuntu) does not implement, and a failing
-/// `set -o` does not abort the script -- so on dash the pipeline would keep
-/// swallowing the failure while looking fixed. Splitting the download from the
-/// execution needs no shell extension and behaves identically on every shell.
+/// `set -o pipefail` is intentionally not used. Support for it is shell- and
+/// build-dependent: it is not universally available on POSIX `sh`
+/// implementations, and where it is unsupported a failing `set -o` does not
+/// abort the script, so the pipeline would keep swallowing the failure while
+/// looking fixed. Splitting the download from the execution needs no shell
+/// extension and behaves identically on every shell.
 ///
 /// `{url}` is filled in with the installer URL.
 const UNIX_INSTALL_SCRIPT: &str = "set -u; script=\"$(mktemp)\"; \
      if curl -LsSf {url} -o \"$script\"; then \
-       sh \"$script\"; status=$?; rm -f \"$script\"; exit \"$status\"; \
+       sh \"$script\" </dev/null; status=$?; rm -f \"$script\"; exit \"$status\"; \
      else \
        status=$?; rm -f \"$script\"; exit \"$status\"; \
      fi";
@@ -420,7 +421,10 @@ fn install_uv() -> Result<()> {
             .unwrap_or_else(|| anyhow!("Failed to install uv: no PowerShell interpreter found")));
     } else {
         // On Unix, download the installer first and only then run it, so a
-        // failed download cannot be mistaken for a successful install.
+        // failed download cannot be mistaken for a successful install. The
+        // script is read from a file, so it would otherwise inherit this
+        // process's stdin; the redirect keeps a future interactive installer
+        // from blocking on it.
         let output = Command::new("sh")
             .arg("-c")
             .arg(unix_install_script("https://astral.sh/uv/install.sh"))
@@ -551,10 +555,17 @@ mod tests {
     /// rather than leaving only its parameterised half exercised.
     #[test]
     fn find_uv_after_install_is_reachable_from_tests() {
-        // Resolves against the real home directory. The outcome depends on
-        // whether `uv` is installed on the host, so this asserts only that the
-        // call is wired up and does not panic.
-        let _ = find_uv_after_install();
+        // Resolves against the real home directory and PATH, so whether this
+        // succeeds depends on the host. Either way the result has to be a real
+        // file: an `Ok` that names a non-existent path would send
+        // `find_uv_executable` on to a spawn that fails with a confusing error.
+        if let Ok(path) = find_uv_after_install() {
+            assert!(
+                path.is_file(),
+                "find_uv_after_install must resolve to an existing file, got: {}",
+                path.display()
+            );
+        }
     }
 
     /// The production `find_uv_in_install_dirs()` has to agree with the
@@ -585,13 +596,35 @@ mod tests {
     }
 
     /// `find_uv_in_install_dirs` must not invent a `uv` that is not there.
+    ///
+    /// The assertion is scoped to the directories derived from the temporary
+    /// home. `uv_install_dirs_for` appends system-wide directories
+    /// (`/usr/local/bin`, `/usr/bin`, `/opt/uv/bin` on Unix;
+    /// `C:\Program Files\uv`, `C:\uv` on Windows) that no test controls, so a
+    /// runner image that ships `uv` there would otherwise fail this test for
+    /// reasons unrelated to the behaviour under test.
     #[test]
     fn find_uv_in_install_dirs_returns_none_when_uv_is_absent() {
         let temp = TempDir::new().unwrap();
         let empty_home = temp.path().join("empty-home");
         fs::create_dir_all(&empty_home).unwrap();
 
-        assert_eq!(find_uv_in_install_dirs_for(Some(&empty_home)), None);
+        let home_dirs: Vec<PathBuf> = uv_install_dirs_for(Some(&empty_home))
+            .into_iter()
+            .filter(|dir| dir.starts_with(&empty_home))
+            .collect();
+
+        assert!(
+            home_dirs.contains(&empty_home.join(".local").join("bin")),
+            "the temporary home must contribute `.local/bin`, got: {home_dirs:?}"
+        );
+
+        let found = home_dirs
+            .into_iter()
+            .map(|dir| dir.join(uv_exe_name()))
+            .find(|path| path.is_file());
+
+        assert_eq!(found, None, "no `uv` may resolve under the empty home");
     }
 
     /// The production `uv_install_dirs()` has to agree with the parameterised
