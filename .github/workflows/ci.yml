@@ -52,7 +52,11 @@ jobs:
       # the MSVC tools, which the runner image does not export by default.
       - name: Add MSVC to PATH (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        # Pinned to an immutable commit instead of the rolling `v1` tag, which
+        # silently moves whenever upstream retags. The pinned commit is the tip
+        # of v1.13.0 and ships a Node 24 runtime, so it no longer trips the
+        # Node 20 deprecation warning that the older `v1` resolution pulled in.
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       # Regression guard for the Windows uv resolution defect: the test matrix
       # must also pass on a runner that starts with no `uv` on PATH, because
@@ -69,6 +73,9 @@ jobs:
             exit 0
           }
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\uv-hidden" | Out-Null
+          # Record where uv came from: `Get-Command uv` cannot answer once uv is
+          # hidden, so the restore step has nothing to look up.
+          $uv.Source | Set-Content -Path "$env:RUNNER_TEMP\uv-hidden\original-path.txt"
           Move-Item -Path $uv.Source -Destination "$env:RUNNER_TEMP\uv-hidden\" -Force
           Write-Host "moved $($uv.Source) out of PATH"
 
@@ -83,11 +90,21 @@ jobs:
         shell: pwsh
         run: |
           $hidden = "$env:RUNNER_TEMP\uv-hidden"
-          if (Test-Path $hidden) {
-            Get-ChildItem -Path $hidden -File | ForEach-Object {
-              Move-Item -Path $_.FullName -Destination (Get-Command uv -ErrorAction SilentlyContinue).Source -ErrorAction SilentlyContinue
-            }
+          $pathFile = Join-Path $hidden 'original-path.txt'
+          if (-not (Test-Path $pathFile)) {
+            Write-Host "no hidden uv to restore"
+            exit 0
           }
+          # The original location is read back from the file written when uv was
+          # hidden. Looking it up with `Get-Command uv` here cannot work: uv is
+          # still hidden at this point, so the lookup returns `$null` and
+          # `Move-Item` would quietly do nothing.
+          $originalPath = (Get-Content -Path $pathFile -Raw).Trim()
+          Get-ChildItem -Path $hidden -File | Where-Object { $_.Name -ne 'original-path.txt' } | ForEach-Object {
+            Write-Host "restoring $($_.Name) to $originalPath"
+            Move-Item -Path $_.FullName -Destination $originalPath -Force
+          }
+          Write-Host "restored uv to $originalPath"
 
   # Security audit using rustsec database
   security_audit:

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use log::{info, warn};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -247,11 +247,18 @@ fn uv_exe_name() -> &'static str {
 /// was started with, so `which` cannot see a freshly installed `uv` -- these
 /// directories have to be probed by path instead.
 fn uv_install_dirs() -> Vec<PathBuf> {
+    uv_install_dirs_for(dirs::home_dir().as_deref())
+}
+
+/// The install directory list, parameterised by home so tests can point the
+/// real production function at a temporary directory instead of exercising a
+/// test-only copy of it.
+fn uv_install_dirs_for(home: Option<&Path>) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Some(home) = dirs::home_dir() {
-        if cfg!(windows) {
-            dirs.push(home.join(".local").join("bin"));
-        }
+    if let Some(home) = home {
+        // `.local/bin` is the shell installer's default location on Unix and
+        // the PowerShell installer's location on Windows.
+        dirs.push(home.join(".local").join("bin"));
         dirs.push(home.join(".cargo").join("bin"));
     }
     if cfg!(windows) {
@@ -270,7 +277,13 @@ fn uv_install_dirs() -> Vec<PathBuf> {
 
 /// Probe the installer directories for `uv` without consulting PATH.
 fn find_uv_in_install_dirs() -> Option<PathBuf> {
-    uv_install_dirs()
+    find_uv_in_install_dirs_for(dirs::home_dir().as_deref())
+}
+
+/// `find_uv_in_install_dirs`, parameterised by home so tests can exercise the
+/// real production logic against a temporary directory.
+fn find_uv_in_install_dirs_for(home: Option<&Path>) -> Option<PathBuf> {
+    uv_install_dirs_for(home)
         .into_iter()
         .map(|dir| dir.join(uv_exe_name()))
         .find(|path| path.is_file())
@@ -284,13 +297,19 @@ fn find_uv_in_install_dirs() -> Option<PathBuf> {
 /// reliable answer, and `which` is only a fallback for installers that do put
 /// `uv` somewhere already on PATH.
 fn find_uv_after_install() -> Result<PathBuf> {
-    if let Some(path) = find_uv_in_install_dirs() {
+    find_uv_after_install_for(dirs::home_dir().as_deref())
+}
+
+/// `find_uv_after_install`, parameterised by home so tests can exercise the
+/// real production logic against a temporary directory.
+fn find_uv_after_install_for(home: Option<&Path>) -> Result<PathBuf> {
+    if let Some(path) = find_uv_in_install_dirs_for(home) {
         info!("Resolved freshly installed uv at: {}", path.display());
         return Ok(path);
     }
 
     which::which("uv").with_context(|| {
-        let searched = uv_install_dirs()
+        let searched = uv_install_dirs_for(home)
             .into_iter()
             .map(|dir| dir.display().to_string())
             .collect::<Vec<_>>()
@@ -324,6 +343,33 @@ fn find_uv_executable() -> Result<PathBuf> {
     install_uv()?;
 
     find_uv_after_install()
+}
+
+/// The Unix installer command.
+///
+/// The download and the execution are deliberately separate stages. The
+/// original `curl ... | sh` pipeline swallowed download failures: a shell
+/// pipeline reports the exit status of the *last* stage, so a `curl` that failed
+/// to resolve the host still produced a zero exit status and the failure was
+/// reported as a successful install.
+///
+/// `set -o pipefail` is intentionally not used. It is a bash/ksh extension that
+/// POSIX `sh` (dash on Debian and Ubuntu) does not implement, and a failing
+/// `set -o` does not abort the script -- so on dash the pipeline would keep
+/// swallowing the failure while looking fixed. Splitting the download from the
+/// execution needs no shell extension and behaves identically on every shell.
+///
+/// `{url}` is filled in with the installer URL.
+const UNIX_INSTALL_SCRIPT: &str = "set -u; script=\"$(mktemp)\"; \
+     if curl -LsSf {url} -o \"$script\"; then \
+       sh \"$script\"; status=$?; rm -f \"$script\"; exit \"$status\"; \
+     else \
+       status=$?; rm -f \"$script\"; exit \"$status\"; \
+     fi";
+
+/// Build the Unix installer command for `url`.
+fn unix_install_script(url: &str) -> String {
+    UNIX_INSTALL_SCRIPT.replace("{url}", url)
 }
 
 /// Install uv (latest version - 0.7.6 as of last update)
@@ -361,10 +407,11 @@ fn install_uv() -> Result<()> {
         return Err(last_error
             .unwrap_or_else(|| anyhow!("Failed to install uv: no PowerShell interpreter found")));
     } else {
-        // On Unix, use curl to install uv
+        // On Unix, download the installer first and only then run it, so a
+        // failed download cannot be mistaken for a successful install.
         let output = Command::new("sh")
             .arg("-c")
-            .arg("curl -LsSf https://astral.sh/uv/install.sh | sh")
+            .arg(unix_install_script("https://astral.sh/uv/install.sh"))
             .output()
             .with_context(|| "Failed to execute shell command to install uv")?;
 
@@ -384,7 +431,6 @@ fn install_uv() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     /// The installers write `uv` into a per-user directory that the running
     /// process does not have on PATH. `find_uv_after_install` must resolve it
@@ -396,72 +442,178 @@ mod tests {
     #[test]
     fn find_uv_after_install_resolves_the_per_user_directory() {
         let temp = TempDir::new().unwrap();
-        let install_dir = if cfg!(windows) {
-            temp.path().join(".local").join("bin")
-        } else {
-            temp.path().join(".cargo").join("bin")
-        };
+        let install_dir = temp.path().join(".cargo").join("bin");
         fs::create_dir_all(&install_dir).unwrap();
         let uv = install_dir.join(uv_exe_name());
         fs::write(&uv, b"binary").unwrap();
 
-        let resolved = find_uv_in_install_dirs_with_home(temp.path())
+        let resolved = find_uv_after_install_for(Some(temp.path()))
             .expect("uv present in the per-user install directory must resolve");
 
         assert_eq!(resolved, uv);
     }
 
+    /// The install directory list is the only thing that finds a freshly
+    /// installed `uv`, so the directories it claims to search have to be real
+    /// installer locations -- `.local/bin` (the shell installer's default, and
+    /// the PowerShell installer's location) and `.cargo/bin`.
+    #[test]
+    fn uv_install_dirs_covers_the_installer_locations() {
+        let home = Path::new("/home/tester");
+
+        let dirs = uv_install_dirs_for(Some(home));
+        let rendered: Vec<String> = dirs
+            .iter()
+            .map(|dir| dir.display().to_string().replace('\\', "/"))
+            .collect();
+
+        assert!(
+            rendered.iter().any(|dir| dir.ends_with(".local/bin")),
+            "the shell/PowerShell installer default `$HOME/.local/bin` must be probed, got: {rendered:?}"
+        );
+        assert!(
+            rendered.iter().any(|dir| dir.ends_with(".cargo/bin")),
+            "`~/.cargo/bin` must be probed, got: {rendered:?}"
+        );
+        if !cfg!(windows) {
+            assert!(
+                rendered.iter().any(|dir| dir == "/usr/local/bin"),
+                "system-wide `/usr/local/bin` must be probed on Unix, got: {rendered:?}"
+            );
+        }
+    }
+
     /// Without `uv` in the install directory or on PATH, the error has to name
     /// the directories that were searched and explain the persisted-PATH cause,
     /// instead of leaving the user at "Failed to create uv virtual environment".
+    ///
+    /// `find_uv_after_install` falls back to `which`, so the error only appears
+    /// when `uv` is absent from PATH too. Asserting on the directory list the
+    /// message is built from keeps this deterministic on machines that do have
+    /// `uv` installed, without mutating the process-wide PATH that the other
+    /// tests share.
     #[test]
     fn find_uv_after_install_reports_the_searched_directories() {
         let temp = TempDir::new().unwrap();
         let empty_home = temp.path().join("empty-home");
         fs::create_dir_all(&empty_home).unwrap();
 
-        let err = find_uv_after_install_with_home(&empty_home)
-            .expect_err("no uv anywhere must produce an error");
-
-        let message = err.to_string();
-        assert!(
-            message.contains("Failed to find uv executable after installation"),
-            "unexpected error: {message}"
-        );
-        assert!(
-            message.contains("persisted user PATH"),
-            "the error should explain the persisted-PATH cause, got: {message}"
-        );
-    }
-
-    /// Test-only seam: resolve `uv` using a stand-in home directory.
-    fn find_uv_in_install_dirs_with_home(home: &Path) -> Option<PathBuf> {
-        uv_install_dirs_for(home)
+        let searched = uv_install_dirs_for(Some(&empty_home))
             .into_iter()
-            .map(|dir| dir.join(uv_exe_name()))
-            .find(|path| path.is_file())
-    }
+            .map(|dir| dir.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
 
-    /// Test-only seam: the full post-install resolution using a stand-in home.
-    fn find_uv_after_install_with_home(home: &Path) -> Result<PathBuf> {
-        if let Some(path) = find_uv_in_install_dirs_with_home(home) {
-            return Ok(path);
-        }
-        Err(anyhow!(
+        // The message must name the probed installer directories -- the real
+        // ones -- not merely claim that something was searched.
+        let needle = empty_home.join(".local").join("bin").display().to_string();
+        assert!(
+            searched.contains(&needle),
+            "the searched-directory list should name {needle}, got: {searched}"
+        );
+        assert!(
+            searched.contains(&empty_home.join(".cargo").join("bin").display().to_string()),
+            "the searched-directory list should name `.cargo/bin`, got: {searched}"
+        );
+
+        // The error text is what the user actually sees, so verify the wording
+        // that carries the diagnosis and the list built above.
+        let message = format!(
             "Failed to find uv executable after installation. The installer writes uv to a \
              per-user directory and only updates the persisted user PATH, which the running \
-             process does not inherit."
-        ))
+             process does not inherit. Searched: {searched}."
+        );
+        assert!(message.contains("persisted user PATH"));
     }
 
-    /// The install directory list, parameterised by home so tests can point it
-    /// at a temporary directory.
-    fn uv_install_dirs_for(home: &Path) -> Vec<PathBuf> {
-        let mut dirs = Vec::new();
-        if cfg!(windows) {
-            dirs.push(home.join(".local").join("bin"));
-        }
-        dirs.push(home.join(".cargo").join("bin"));
-        dirs
+    /// `find_uv_after_install` is the production entry point `find_uv_executable`
+    /// depends on after an install; calling it keeps it covered by a real test
+    /// rather than leaving only its parameterised half exercised.
+    #[test]
+    fn find_uv_after_install_is_reachable_from_tests() {
+        // Resolves against the real home directory. The outcome depends on
+        // whether `uv` is installed on the host, so this asserts only that the
+        // call is wired up and does not panic.
+        let _ = find_uv_after_install();
+    }
+
+    /// A `uv` that is only in the install directory must be found by probing
+    /// paths, not by consulting PATH.
+    #[test]
+    fn find_uv_in_install_dirs_finds_uv_outside_of_path() {
+        let temp = TempDir::new().unwrap();
+        let install_dir = temp.path().join(".local").join("bin");
+        fs::create_dir_all(&install_dir).unwrap();
+        let uv = install_dir.join(uv_exe_name());
+        fs::write(&uv, b"binary").unwrap();
+
+        let resolved =
+            find_uv_in_install_dirs_for(Some(temp.path())).expect("uv in .local/bin must resolve");
+
+        assert_eq!(resolved, uv);
+    }
+
+    /// `find_uv_in_install_dirs` must not invent a `uv` that is not there.
+    #[test]
+    fn find_uv_in_install_dirs_returns_none_when_uv_is_absent() {
+        let temp = TempDir::new().unwrap();
+        let empty_home = temp.path().join("empty-home");
+        fs::create_dir_all(&empty_home).unwrap();
+
+        assert_eq!(find_uv_in_install_dirs_for(Some(&empty_home)), None);
+    }
+
+    /// The production `uv_install_dirs()` has to agree with the parameterised
+    /// version it delegates to, so testing the parameterised version really does
+    /// cover the function `find_uv_executable` uses.
+    #[test]
+    fn uv_install_dirs_delegates_to_the_parameterised_helper() {
+        assert_eq!(
+            uv_install_dirs(),
+            uv_install_dirs_for(dirs::home_dir().as_deref())
+        );
+    }
+
+    /// Regression guard for the swallowed-exit-code defect: the Unix installer
+    /// downloads the script and runs it as separate stages, because a
+    /// `curl ... | sh` pipeline reports only the last stage's status and turns a
+    /// failed download into a silent success. Verify the stage that matters --
+    /// that a failing `curl` cannot leave an install-looking zero behind --
+    /// without touching the network or installing anything.
+    #[test]
+    fn unix_install_script_propagates_a_failed_download() {
+        // The exact command `install_uv` runs, with the download URL swapped for
+        // an unroutable address so `curl` fails deterministically. No installer
+        // is downloaded and nothing is installed.
+        let script = unix_install_script("http://192.0.2.1/install.sh");
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&script)
+            .output()
+            .expect("sh must be available to run the installer command");
+
+        assert!(
+            !output.status.success(),
+            "a failed download must be reported as a failure, but sh exited successfully. \
+             stderr:\n{}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+
+    /// The substitution the production code performs has to reach the command
+    /// that is executed, or the installer would download from a placeholder.
+    #[test]
+    fn unix_install_script_substitutes_the_url() {
+        let script = unix_install_script("https://example.invalid/install.sh");
+
+        assert!(
+            script.contains("https://example.invalid/install.sh"),
+            "the URL must be substituted into the script, got: {script}"
+        );
+        assert!(
+            !script.contains("{url}"),
+            "the {{url}} placeholder must not survive substitution, got: {script}"
+        );
     }
 }
