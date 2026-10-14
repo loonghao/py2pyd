@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9](https://github.com/loonghao/py2pyd/compare/v0.1.8...v0.1.9) - 2026-10-13
+
+### Fixed
+
+- propagate Unix uv installer download failures and cover uv_env resolvers
+- resolve uv from its install directory after installing it on Windows
+
+### Other
+
+- harden uv_env tests against host state and isolate installer stdin ([#123](https://github.com/loonghao/py2pyd/pull/123))
+
 ## [0.1.8](https://github.com/loonghao/py2pyd/compare/v0.1.7...v0.1.8) - 2026-10-13
 
 ### Fixed
